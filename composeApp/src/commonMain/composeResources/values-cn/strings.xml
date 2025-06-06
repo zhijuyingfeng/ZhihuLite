@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">知乎Lite</string>
+    <string name="interaction_count">%1$d 赞同 ‧ %2$d 评论</string>
+</resources>

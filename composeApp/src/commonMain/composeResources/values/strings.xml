@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">ZhihuLite</string>
+    <string name="interaction_count">%1$d Votes Up ‧ %2$d Comments</string>
+    <string name="Cookie">Cookie</string>
+    <string name="Osa">Osa</string>
+    <string name="Osd">Osd</string>
+</resources>
