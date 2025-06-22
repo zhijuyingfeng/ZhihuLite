@@ -12,6 +12,7 @@ import zhihulite.composeapp.generated.resources.Res
 
 interface FeedApi {
     suspend fun getFeedResponse(): FeedResponse?
+    suspend fun getAnswerList(path: String): FeedResponse?
 }
 
 class KtorFeedApi(
@@ -25,7 +26,6 @@ class KtorFeedApi(
                 headers {
                     append("Accept-Charset", "utf-8")
                     append("User-Agent", "Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0")
-                    //TODO Remove Cookie later
                     append("Cookie", Settings().get<String>(Res.string.Cookie.key).toString())
                     append("Referer", "https://www.zhihu.com/")
                 }
@@ -36,5 +36,9 @@ class KtorFeedApi(
             e.printStackTrace()
             null
         }
+    }
+
+    override suspend fun getAnswerList(path: String): FeedResponse? {
+        TODO("Not yet implemented")
     }
 }

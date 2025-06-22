@@ -39,6 +39,8 @@ kotlin {
             implementation(compose.preview)
             implementation(libs.androidx.activity.compose)
             implementation(libs.ktor.client.okhttp)
+            implementation(libs.duktape.android)
+            implementation(libs.kotlin.testJunit)
         }
         commonMain.dependencies {
             implementation(compose.runtime)
@@ -74,10 +76,14 @@ kotlin {
         desktopMain.dependencies {
             implementation(compose.desktop.currentOs)
             implementation(libs.kotlinx.coroutinesSwing)
+            implementation(libs.graalvm)
         }
         iosMain.dependencies {
             implementation(libs.ktor.client.darwin)
         }
+    }
+    sourceSets.androidInstrumentedTest.dependencies {
+        implementation(kotlin("test"))
     }
 }
 

@@ -21,6 +21,8 @@ coil = "3.2.0"
 kotlinx-collections-immutable = "0.4.0"
 napier-log = "2.7.1"
 multiplatform-settings = "1.1.1"
+duktape-android = "1.4.0"
+graalvm = "22.3.2"
 
 [libraries]
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
@@ -44,6 +46,8 @@ ktor-client-okhttp = { module = "io.ktor:ktor-client-okhttp", version.ref = "kto
 ktor-serialization-kotlinx-json = { module = "io.ktor:ktor-serialization-kotlinx-json", version.ref = "ktor" }
 coil-compose = { group = "io.coil-kt.coil3", name = "coil-compose", version.ref = "coil" }
 coil-network-ktor = { group = "io.coil-kt.coil3", name = "coil-network-ktor3", version.ref = "coil" }
+duktape-android = { group = "com.squareup.duktape", name = "duktape-android", version.ref = "duktape-android" }
+graalvm = { group = "org.graalvm.js", name = "js", version.ref = "graalvm" }
 
 kotlinx-collections-immutable = { module = "org.jetbrains.kotlinx:kotlinx-collections-immutable", version.ref = "kotlinx-collections-immutable" }
 
