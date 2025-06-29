@@ -1,5 +1,5 @@
 package org.nigao.zhihu_lite.utils.JsEvaluator
 
 expect object JsEvaluator {
-    suspend fun evaluate(script: String, functionName: String, args: List<Any>): String
+    suspend fun evaluate(script: String): String
 }

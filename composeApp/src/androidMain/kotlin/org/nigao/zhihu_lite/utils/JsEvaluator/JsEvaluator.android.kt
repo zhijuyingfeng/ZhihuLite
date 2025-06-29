@@ -24,28 +24,6 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import kotlin.coroutines.resumeWithException
 
-//actual object JsEvaluator {
-//    private lateinit var webView: WebView
-//
-//    fun initialize(context: Context) {
-//        webView = WebView(context).apply {
-//            @SuppressLint("SetJavaScriptEnabled")
-//            settings.javaScriptEnabled = true
-//            webViewClient = WebViewClient()
-//            loadUrl("https://www.zhihu.com")
-//        }
-//    }
-//
-//    actual fun evaluate(script: String, functionName: String, args: List<Any>): String {
-//        var result: String? = null
-//        webView.evaluateJavascript(script) {
-//            result = it
-//        }
-//        println("Js evaluated, result: $result")
-//        return result.toString()
-//    }
-//}
-
 actual object JsEvaluator {
     private var webViewRef = WeakReference<WebView>(null)
     private val requestChannel = Channel<JsRequest>(Channel.UNLIMITED)
@@ -61,7 +39,7 @@ actual object JsEvaluator {
 
         withContext(Dispatchers.Main) {
             if (webViewRef.get() == null) {
-                WebView(application).apply {
+                val webView = WebView(application).apply {
                     with(settings) {
                         @SuppressLint("SetJavaScriptEnabled")
                         javaScriptEnabled = true
@@ -85,8 +63,8 @@ actual object JsEvaluator {
                     }
 
                     loadUrl("https://www.zhihu.com")
-                    webViewRef = WeakReference(this)
                 }
+                webViewRef = WeakReference(webView)
             }
         }
     }
@@ -123,7 +101,7 @@ actual object JsEvaluator {
         }
     }
 
-    actual suspend fun evaluate(script: String, functionName: String, args: List<Any>): String {
+    actual suspend fun evaluate(script: String): String {
         return suspendCancellableCoroutine { continuation ->
             if (coroutineScope == null || !coroutineScope!!.isActive) {
                 continuation.resumeWithException(IllegalStateException("Singleton not initialized"))

@@ -40,6 +40,23 @@ interface ImageLoader {
     )
 }
 
+class CoilImageLoader: ImageLoader {
+    @Composable
+    override fun LoadImage(
+        src: String,
+        contentDescription: String?,
+        modifier: Modifier,
+        contentScale: ContentScale
+    ) {
+        AsyncImage(
+            model = src,
+            contentDescription = contentDescription,
+            modifier = modifier,
+            contentScale = contentScale
+        )
+    }
+}
+
 sealed class HtmlNode {
     abstract fun toHtml(): String
 

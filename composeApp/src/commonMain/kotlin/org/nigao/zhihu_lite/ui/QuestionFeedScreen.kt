@@ -1,6 +1,5 @@
 package org.nigao.zhihu_lite.ui
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -10,7 +9,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -20,32 +18,30 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import coil3.compose.AsyncImage
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
-import org.koin.core.parameter.parametersOf
 import org.koin.compose.viewmodel.koinViewModel
-import org.nigao.zhihu_lite.Routes
+import org.koin.core.parameter.parametersOf
 import org.nigao.zhihu_lite.model.FeedItem
 import org.nigao.zhihu_lite.ui.commonUi.InfiniteFeedList
 import org.nigao.zhihu_lite.utils.CoilImageLoader
 import org.nigao.zhihu_lite.utils.HtmlToComposeUi
-import org.nigao.zhihu_lite.utils.ImageLoader
 import zhihulite.composeapp.generated.resources.Res
 import zhihulite.composeapp.generated.resources.avatar_placeholder
 import zhihulite.composeapp.generated.resources.interaction_count
 
 @Composable
-fun FeedScreen(
+fun QuestionFeedScreen(
+    questionId: String,
     navController: NavController,
-    modifier: Modifier = Modifier,
+    modifier: Modifier = Modifier
 ) {
-    val viewModel: FeedViewModel = koinViewModel<FeedViewModel> (
-        parameters = { parametersOf("https://www.zhihu.com/api/v3/feed/topstory/recommend") }
+    val viewModel: QuestionViewModel = koinViewModel<QuestionViewModel> (
+        parameters = { parametersOf("https://www.zhihu.com/api/v4/questions/${questionId}/feeds") }
     )
     val feedItems by viewModel.feedItems.collectAsStateWithLifecycle()
 
@@ -53,29 +49,20 @@ fun FeedScreen(
         feedItems = feedItems,
         getMoreItems = { viewModel.getMoreItems() },
         content = { feedItem, modifier ->
-            FeedItemCard(feedItem, navController, modifier)
+            AnswerCard(feedItem, modifier)
         },
         modifier = modifier
     )
 }
 
 @Composable
-fun FeedItemCard(
+fun AnswerCard(
     feedItem: FeedItem,
-    navController: NavController,
     modifier: Modifier = Modifier
 ) {
     Column(
         modifier = modifier
     ) {
-        Text(
-            text = feedItem.target.question?.title.toString(),
-            style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier.padding(bottom = 8.dp).clickable {
-                require(feedItem.target.question?.id?.isNotBlank() == true)
-                navController.navigate("question_detail/${feedItem.target.question.id}")
-            }
-        )
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.Start

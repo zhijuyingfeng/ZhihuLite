@@ -39,7 +39,6 @@ kotlin {
             implementation(compose.preview)
             implementation(libs.androidx.activity.compose)
             implementation(libs.ktor.client.okhttp)
-            implementation(libs.duktape.android)
             implementation(libs.kotlin.testJunit)
         }
         commonMain.dependencies {
@@ -64,6 +63,7 @@ kotlin {
             implementation(libs.coil.network.ktor)
 
             implementation(libs.kotlinx.collections.immutable)
+            implementation(libs.navigation.compose)
 
             implementation(libs.napier.log)
 

@@ -14,7 +14,7 @@ data class User(
     @SerialName("avatar_url") val avatarUrl: String,
     @SerialName("is_org") val isOrg: Boolean,
     val gender: Int,
-    @SerialName("followers_count") val followersCount: Int,
+    @SerialName("followers_count") val followersCount: Int? = 0,
     @SerialName("is_following") val isFollowing: Boolean,
     @SerialName("is_followed") val isFollowed: Boolean
 )
