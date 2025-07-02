@@ -5,17 +5,16 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class Paging(
-    @SerialName(value = "is_end") val isEnd: Boolean,
-    @SerialName(value = "is_start") val isStart: Boolean,
-    val next: String,
-    val previous: String,
-    val totals: Int,
+    @SerialName(value = "is_end") val isEnd: Boolean? = false,
+    @SerialName(value = "is_start") val isStart: Boolean? = false,
+    val next: String ?= null,
+    val previous: String? = null,
+    val totals: Int? = 0,
 )
 
 @Serializable
 data class FeedResponse(
     val data: List<FeedItem>,
     val paging: Paging,
-    @SerialName(value = "fresh_text") val freshText: String
-) {
-}
+    @SerialName(value = "fresh_text") val freshText: String? = null,
+)

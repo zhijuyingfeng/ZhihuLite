@@ -6,16 +6,16 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class FeedItem(
-    val id: String,
-    val type: String,
-    val offset: Int,
-    val verb: String,
-    @SerialName("created_time") val createdTime: Long,
-    @SerialName("updated_time") val updatedTime: Long,
-    val target: Target,
-    val brief: String,
-    @SerialName("attached_info") val attachedInfo: String,
-    @SerialName("action_card") val actionCard: Boolean
+    val id: String? = null,
+    val type: String? = null,
+    val offset: Int? = 0,
+    val verb: String? = null,
+    @SerialName("created_time") val createdTime: Long? = 0,
+    @SerialName("updated_time") val updatedTime: Long? = 0,
+    val target: Target? = null,
+    val brief: String? = null,
+    @SerialName("attached_info") val attachedInfo: String? = null,
+    @SerialName("action_card") val actionCard: Boolean? = false,
 )
 
 @Serializable
@@ -32,24 +32,24 @@ data class Target(
     @SerialName("is_copyable") val isCopyable: Boolean = false,
     val question: Question? = null,
     val excerpt: String,
-    @SerialName("excerpt_new") val excerptNew: String,
-    @SerialName("preview_type") val previewType: String,
-    @SerialName("preview_text") val previewText: String,
+    @SerialName("excerpt_new") val excerptNew: String? = null,
+    @SerialName("preview_type") val previewType: String? = null,
+    @SerialName("preview_text") val previewText: String? = null,
     @SerialName("reshipment_settings") val reshipmentSettings: String? = null,
-    val content: String,
+    val content: String? = null,
     val relationship: AnswerRelationship? = null,
-    @SerialName("is_labeled") val isLabeled: Boolean,
-    @SerialName("visited_count") val visitedCount: Int,
-    @SerialName("favorite_count") val favoriteCount: Int,
+    @SerialName("is_labeled") val isLabeled: Boolean? = false,
+    @SerialName("visited_count") val visitedCount: Int? = 0,
+    @SerialName("favorite_count") val favoriteCount: Int? = 0,
     @SerialName("answer_type") val answerType: String? = null,
-    @SerialName("is_navigator") val isNavigator: Boolean,
-    @SerialName("navigator_vote") val navigatorVote: Boolean,
-    @SerialName("vote_next_step") val voteNextStep: String
+    @SerialName("is_navigator") val isNavigator: Boolean? = false,
+    @SerialName("navigator_vote") val navigatorVote: Boolean? = false,
+    @SerialName("vote_next_step") val voteNextStep: String? = null,
 )
 
 @Serializable
 data class AnswerRelationship(
-    @SerialName("is_thanked") val isThanked: Boolean,
-    @SerialName("is_nothelp") val isNotHelp: Boolean,
-    val voting: Int
+    @SerialName("is_thanked") val isThanked: Boolean? = false,
+    @SerialName("is_nothelp") val isNotHelp: Boolean? = false,
+    val voting: Int? = 0
 )

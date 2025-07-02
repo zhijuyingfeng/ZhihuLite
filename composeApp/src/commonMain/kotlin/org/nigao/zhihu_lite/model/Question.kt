@@ -12,7 +12,7 @@ data class Question(
     val title: String,
     val created: Long,
     @SerialName("answer_count") val answerCount: Int? = 0,
-    @SerialName("follower_count") val followerCount: Int,
+    @SerialName("follower_count") val followerCount: Int? = 0,
     @SerialName("comment_count") val commentCount: Int? = 0,
     @SerialName("bound_topic_ids") val boundTopicIds: List<Int>? = null,
     @SerialName("is_following") val isFollowing: Boolean? = false,

@@ -69,10 +69,10 @@ fun FeedItemCard(
         modifier = modifier
     ) {
         Text(
-            text = feedItem.target.question?.title.toString(),
+            text = feedItem.target?.question?.title.toString(),
             style = MaterialTheme.typography.titleMedium,
             modifier = Modifier.padding(bottom = 8.dp).clickable {
-                require(feedItem.target.question?.id?.isNotBlank() == true)
+                require(feedItem.target?.question?.id?.isNotBlank() == true)
                 navController.navigate("question_detail/${feedItem.target.question.id}")
             }
         )
@@ -81,8 +81,8 @@ fun FeedItemCard(
             horizontalArrangement = Arrangement.Start
         ) {
             AsyncImage(
-                model = feedItem.target.author.avatarUrl,
-                contentDescription = feedItem.target.author.name,
+                model = feedItem.target?.author?.avatarUrl,
+                contentDescription = feedItem.target?.author?.name,
                 placeholder = painterResource(Res.drawable.avatar_placeholder),
                 modifier = Modifier.clip(CircleShape).size(20.dp)
             )
@@ -90,13 +90,15 @@ fun FeedItemCard(
                 modifier = Modifier.width(4.dp)
             )
             Text(
-                text = feedItem.target.author.name,
+                text = feedItem.target?.author?.name.toString(),
                 style = MaterialTheme.typography.labelMedium
             )
         }
-        HtmlToComposeUi(feedItem.target.content, imageLoader = CoilImageLoader())
+        HtmlToComposeUi(feedItem.target?.content.toString(), imageLoader = CoilImageLoader())
         Text(
-            text = stringResource(Res.string.interaction_count, feedItem.target.voteupCount, feedItem.target.commentCount),
+            text = stringResource(Res.string.interaction_count,
+                feedItem.target?.voteupCount ?: 0, feedItem.target?.commentCount ?: 0
+            ),
             style = MaterialTheme.typography.labelMedium,
         )
         HorizontalDivider(

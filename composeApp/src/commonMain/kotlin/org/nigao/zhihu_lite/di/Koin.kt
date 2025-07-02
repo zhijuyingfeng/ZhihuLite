@@ -34,7 +34,9 @@ val dataModule = module {
 
     single<FeedApi>(NATIVE_API) { KtorFeedApi(get()) }
     single<FeedApi>(WEBVIEW_API) { WebviewFeedApi() }
-    single<FeedStorage> { MemoryFeedStorage() }
+    factory<FeedStorage> {
+        MemoryFeedStorage()
+    }
 
     factory(NATIVE_API) { (baseUrl: String) ->
         FeedRepository(

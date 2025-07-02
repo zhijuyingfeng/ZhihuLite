@@ -31,7 +31,7 @@ class MemoryFeedStorage(): FeedStorage {
     private fun filterFeedItems(feedItems: List<FeedItem>): List<FeedItem> {
         return feedItems
             .filter {
-                val shouldFilter = it.target.type == "article"
+                val shouldFilter = it.target != null && it.target.type == "article"
                 if (shouldFilter) {
                     Napier.i("Feed item filtered, reason: it's article, item: ${it.id}, ${it.target.excerptNew}")
                 }
@@ -44,7 +44,7 @@ class MemoryFeedStorage(): FeedStorage {
 
     private fun logItems(increasedItems: List<FeedItem>) {
         increasedItems.forEach {
-            Napier.i("Increasing item, id: ${it.id}, ${it.target.excerptNew}")
+            Napier.i("Increasing item, id: ${it.id}, ${it.target?.excerptNew}")
         }
     }
 

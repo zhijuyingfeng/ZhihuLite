@@ -68,7 +68,7 @@ fun InfiniteFeedList(
         items(
             count = feedItems.count(),
             key = {
-                feedItems[it].target.id
+                feedItems[it].target?.id.toString()
             }
         ) {
             content(feedItems[it], modifier.fillMaxWidth())

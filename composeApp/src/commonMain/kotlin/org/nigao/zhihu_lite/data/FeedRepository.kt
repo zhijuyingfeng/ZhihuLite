@@ -23,9 +23,14 @@ class FeedRepository(
     }
 
     suspend fun getMoreItems() {
-        require(lastResponse != null)
-        val feedItems = parseFeedItems(feedApi.getFeedResponse(lastResponse!!.paging.next))
-        feedStorage.appendFeedItems(feedItems)
+        if(lastResponse == null) {
+            refreshItems()
+        } else {
+            val response = feedApi.getFeedResponse(lastResponse!!.paging.next.toString())
+            val feedItems = parseFeedItems(response)
+            feedStorage.appendFeedItems(feedItems)
+            lastResponse = response
+        }
     }
 
     suspend fun refreshItems() {
