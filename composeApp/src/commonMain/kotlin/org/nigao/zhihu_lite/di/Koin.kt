@@ -7,11 +7,13 @@ import kotlinx.serialization.json.Json
 import io.ktor.serialization.kotlinx.json.json
 import org.koin.core.context.startKoin
 import org.koin.core.parameter.parametersOf
+import org.koin.core.qualifier.Qualifier
 import org.koin.core.qualifier.named
 import org.koin.dsl.module
 import org.nigao.zhihu_lite.data.FeedRepository
 import org.nigao.zhihu_lite.data.FeedStorage
 import org.nigao.zhihu_lite.data.MemoryFeedStorage
+import org.nigao.zhihu_lite.model.FeedItem
 import org.nigao.zhihu_lite.network.FeedApi
 import org.nigao.zhihu_lite.network.KtorFeedApi
 import org.nigao.zhihu_lite.network.WebviewFeedApi
@@ -38,36 +40,42 @@ val dataModule = module {
         MemoryFeedStorage()
     }
 
-    factory(NATIVE_API) { (baseUrl: String) ->
+    factory(NATIVE_API) { (baseUrl: String, initialItems: List<FeedItem>) ->
         FeedRepository(
             initialUrl = baseUrl,
             feedApi = get(NATIVE_API),
-            feedStorage = get()
+            feedStorage = get(),
+            initialItems = initialItems,
         )
     }
 
-    factory(WEBVIEW_API) { (baseUrl: String) ->
+    factory(WEBVIEW_API) { (baseUrl: String, initialItems: List<FeedItem>) ->
         FeedRepository(
             initialUrl = baseUrl,
             feedApi = get(WEBVIEW_API),
-            feedStorage = get()
+            feedStorage = get(),
+            initialItems = initialItems,
         )
+    }
+
+    factory(NATIVE_API) {
+
     }
 }
 
 val viewModelModule = module {
-    factory { (baseUrl: String) ->
+    factory { (baseUrl: String, initialItems: List<FeedItem>) ->
         FeedViewModel(
             feedRepository = get(NATIVE_API) {
-                parametersOf(baseUrl)
+                parametersOf(baseUrl, initialItems)
             }
         )
     }
 
-    factory { (baseUrl: String) ->
+    factory { (baseUrl: String, initialItems: List<FeedItem>) ->
         QuestionViewModel(
             feedRepository = get(WEBVIEW_API) {
-                parametersOf(baseUrl)
+                parametersOf(baseUrl, initialItems)
             }
         )
     }

@@ -11,26 +11,39 @@ import org.nigao.zhihu_lite.network.FeedApi
 class FeedRepository(
     private val initialUrl: String,
     private val feedApi: FeedApi,
-    private val feedStorage: FeedStorage
+    private val feedStorage: FeedStorage,
+    val initialItems: List<FeedItem> = emptyList(),
 ) {
     private val scope = CoroutineScope(SupervisorJob())
     private var lastResponse: FeedResponse? = null
 
+    init {
+        scope.launch {
+            feedStorage.appendFeedItems(initialItems)
+        }
+    }
+
     fun initialize() {
         scope.launch {
-            refreshItems()
+            getInitialItems()
         }
     }
 
     suspend fun getMoreItems() {
         if(lastResponse == null) {
-            refreshItems()
+            getInitialItems()
         } else {
             val response = feedApi.getFeedResponse(lastResponse!!.paging.next.toString())
             val feedItems = parseFeedItems(response)
             feedStorage.appendFeedItems(feedItems)
             lastResponse = response
         }
+    }
+
+    suspend fun getInitialItems() {
+        lastResponse = feedApi.getFeedResponse(initialUrl)
+        val feedItems = parseFeedItems(lastResponse)
+        feedStorage.appendFeedItems(feedItems)
     }
 
     suspend fun refreshItems() {

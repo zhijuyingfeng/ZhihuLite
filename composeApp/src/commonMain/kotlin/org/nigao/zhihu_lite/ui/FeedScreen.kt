@@ -1,11 +1,13 @@
 package org.nigao.zhihu_lite.ui
 
+import androidx.annotation.ColorLong
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -31,6 +33,7 @@ import org.koin.core.parameter.parametersOf
 import org.koin.compose.viewmodel.koinViewModel
 import org.nigao.zhihu_lite.Routes
 import org.nigao.zhihu_lite.model.FeedItem
+import org.nigao.zhihu_lite.ui.commonUi.ImageGallery
 import org.nigao.zhihu_lite.ui.commonUi.InfiniteFeedList
 import org.nigao.zhihu_lite.utils.CoilImageLoader
 import org.nigao.zhihu_lite.utils.HtmlToComposeUi
@@ -45,7 +48,11 @@ fun FeedScreen(
     modifier: Modifier = Modifier,
 ) {
     val viewModel: FeedViewModel = koinViewModel<FeedViewModel> (
-        parameters = { parametersOf("https://www.zhihu.com/api/v3/feed/topstory/recommend") }
+        parameters = {
+            parametersOf(
+                "https://www.zhihu.com/api/v3/feed/topstory/recommend",
+                emptyList<FeedItem>()
+            ) }
     )
     val feedItems by viewModel.feedItems.collectAsStateWithLifecycle()
 
@@ -71,7 +78,7 @@ fun FeedItemCard(
         Text(
             text = feedItem.target?.question?.title.toString(),
             style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier.padding(bottom = 8.dp).clickable {
+            modifier = Modifier.padding(bottom = 4.dp).clickable {
                 require(feedItem.target?.question?.id?.isNotBlank() == true)
                 navController.navigate("question_detail/${feedItem.target.question.id}")
             }
@@ -86,20 +93,32 @@ fun FeedItemCard(
                 placeholder = painterResource(Res.drawable.avatar_placeholder),
                 modifier = Modifier.clip(CircleShape).size(20.dp)
             )
-            Spacer(
-                modifier = Modifier.width(4.dp)
-            )
             Text(
                 text = feedItem.target?.author?.name.toString(),
-                style = MaterialTheme.typography.labelMedium
+                style = MaterialTheme.typography.labelMedium,
+                color = Color.Gray,
+                modifier = Modifier.padding(start = 4.dp),
             )
         }
-        HtmlToComposeUi(feedItem.target?.content.toString(), imageLoader = CoilImageLoader())
+        Text(
+            text = feedItem.target?.excerptNew.toString(),
+            style = MaterialTheme.typography.labelLarge,
+            color = Color.DarkGray,
+            modifier = Modifier.padding(top = 4.dp),
+        )
+        if (feedItem.target?.thumbnails?.isNotEmpty() == true) {
+            ImageGallery(
+                imageUrls = feedItem.target.thumbnails,
+                modifier = Modifier.height(160.dp).padding(top = 4.dp, bottom = 4.dp),
+            )
+        }
         Text(
             text = stringResource(Res.string.interaction_count,
                 feedItem.target?.voteupCount ?: 0, feedItem.target?.commentCount ?: 0
             ),
             style = MaterialTheme.typography.labelMedium,
+            color = Color.Gray,
+            modifier = Modifier.padding(top = 4.dp),
         )
         HorizontalDivider(
             thickness = 1.dp,

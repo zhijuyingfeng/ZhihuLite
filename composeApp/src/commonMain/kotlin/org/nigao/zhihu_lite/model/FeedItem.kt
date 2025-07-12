@@ -31,6 +31,8 @@ data class Target(
     @SerialName("comment_count") val commentCount: Int = 0,
     @SerialName("is_copyable") val isCopyable: Boolean = false,
     val question: Question? = null,
+    val thumbnail: String? = null,
+    val thumbnails: List<String>? = emptyList<String>(),
     val excerpt: String,
     @SerialName("excerpt_new") val excerptNew: String? = null,
     @SerialName("preview_type") val previewType: String? = null,
