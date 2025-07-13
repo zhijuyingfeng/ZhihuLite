@@ -15,7 +15,9 @@ fun LogInScreen(
     AuthWebView("https://www.zhihu.com/signin",
         onAuthComplete = {
             LogInManager.logIn(it)
-            navController.navigate(Routes.MAIN_FEED)
+            navController.navigate(Routes.MAIN_FEED) {
+                popUpTo(Routes.LOG_IN) { inclusive = true }
+            }
         },
         modifier = modifier
     )

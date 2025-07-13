@@ -69,6 +69,8 @@ kotlin {
 
             implementation(libs.multiplatform.settings)
             implementation(libs.multiplatform.settings.no.arg)
+
+            implementation(libs.datetime)
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
@@ -115,6 +117,10 @@ android {
 
     buildFeatures {
         buildConfig = true
+    }
+
+    lint {
+        disable.add("NullSafeMutableLiveData")
     }
 }
 

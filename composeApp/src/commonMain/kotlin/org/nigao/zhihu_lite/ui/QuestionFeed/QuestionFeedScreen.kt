@@ -14,6 +14,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -22,18 +23,22 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import coil3.compose.AsyncImage
+import io.github.aakira.napier.Napier
+import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 import org.koin.core.parameter.parametersOf
 import org.nigao.zhihu_lite.data.FeedItemRepository
 import org.nigao.zhihu_lite.model.FeedItem
+import org.nigao.zhihu_lite.ui.MainFeed.formatTimestamp
 import org.nigao.zhihu_lite.ui.commonUi.InfiniteFeedList
 import org.nigao.zhihu_lite.utils.CoilImageLoader
 import org.nigao.zhihu_lite.utils.HtmlToComposeUi
 import zhihulite.composeapp.generated.resources.Res
 import zhihulite.composeapp.generated.resources.avatar_placeholder
-import zhihulite.composeapp.generated.resources.interaction_count
+import zhihulite.composeapp.generated.resources.comment_count
+import zhihulite.composeapp.generated.resources.votes_up_count
 
 @Composable
 fun QuestionFeedScreen(
@@ -56,6 +61,7 @@ fun QuestionFeedScreen(
         ) }
     )
     val feedItems by viewModel.feedItems.collectAsStateWithLifecycle()
+    val scope = rememberCoroutineScope()
 
     InfiniteFeedList(
         feedItems = feedItems,
@@ -63,7 +69,14 @@ fun QuestionFeedScreen(
         content = { feedItem, modifier ->
             AnswerCard(feedItem, modifier)
         },
-        modifier = modifier
+        modifier = modifier,
+        onCellShow = { index ->
+            val item = feedItems[index]
+            Napier.i("Cell show. id: ${item.target?.id}, excerpt: ${item.target?.excerpt}")
+            scope.launch {
+                viewModel.eventReporter.reportRead(item)
+            }
+        }
     )
 }
 
@@ -94,9 +107,15 @@ fun AnswerCard(
         }
         HtmlToComposeUi(feedItem.target?.content.toString(), imageLoader = CoilImageLoader())
         Text(
-            text = stringResource(Res.string.interaction_count,
-                feedItem.target?.voteupCount ?: 0, feedItem.target?.commentCount ?: 0
-            ),
+            text = buildString {
+                append(stringResource(Res.string.votes_up_count, feedItem.target?.voteupCount ?: 0))
+                append(" ‧ ")
+                append(stringResource(Res.string.comment_count, feedItem.target?.commentCount ?: 0))
+                if (feedItem.target != null) {
+                    append(" ‧ ")
+                    append(formatTimestamp(feedItem.target.updatedTime))
+                }
+            },
             style = MaterialTheme.typography.labelMedium,
             color = Color.Gray,
         )

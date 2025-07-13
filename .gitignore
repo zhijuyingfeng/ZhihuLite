@@ -17,3 +17,5 @@ captures
 !*.xcworkspace/contents.xcworkspacedata
 **/xcshareddata/WorkspaceSettings.xcsettings
 ApiTest/node_modules/
+composeApp/release/*
+gradle/release-key.jks

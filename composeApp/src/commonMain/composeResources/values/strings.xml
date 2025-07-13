@@ -1,4 +1,5 @@
 <resources>
     <string name="app_name">ZhihuLite</string>
-    <string name="interaction_count">%1$d Votes Up ‧ %2$d Comments</string>
+    <string name="votes_up_count">%1$d Votes Up</string>
+    <string name="comment_count">%1$d Comments</string>
 </resources>

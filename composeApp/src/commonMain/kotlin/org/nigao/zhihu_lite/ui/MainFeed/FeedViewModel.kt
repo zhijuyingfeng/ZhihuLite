@@ -6,10 +6,12 @@ import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.stateIn
 import org.nigao.zhihu_lite.data.FeedRepository
+import org.nigao.zhihu_lite.utils.EventReporter
 
 
 class FeedViewModel(
-    private val feedRepository: FeedRepository
+    private val feedRepository: FeedRepository,
+    val eventReporter: EventReporter,
 ): ViewModel() {
     init {
         feedRepository.initialize()
