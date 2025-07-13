@@ -1,4 +1,4 @@
-package org.nigao.zhihu_lite.ui
+package org.nigao.zhihu_lite.ui.QuestionFeed
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column

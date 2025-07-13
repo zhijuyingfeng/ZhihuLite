@@ -17,9 +17,9 @@ import androidx.navigation.navArgument
 import androidx.savedstate.read
 import org.jetbrains.compose.ui.tooling.preview.Preview
 import org.nigao.zhihu_lite.model.Question
-import org.nigao.zhihu_lite.ui.FeedScreen
-import org.nigao.zhihu_lite.ui.LogInScreen
-import org.nigao.zhihu_lite.ui.QuestionFeedScreen
+import org.nigao.zhihu_lite.ui.MainFeed.FeedScreen
+import org.nigao.zhihu_lite.ui.LogIn.LogInScreen
+import org.nigao.zhihu_lite.ui.QuestionFeed.QuestionFeedScreen
 import org.nigao.zhihu_lite.utils.auth.LogInManager
 
 object Routes {

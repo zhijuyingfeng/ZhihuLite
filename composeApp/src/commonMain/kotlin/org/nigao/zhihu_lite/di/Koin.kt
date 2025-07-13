@@ -7,7 +7,6 @@ import kotlinx.serialization.json.Json
 import io.ktor.serialization.kotlinx.json.json
 import org.koin.core.context.startKoin
 import org.koin.core.parameter.parametersOf
-import org.koin.core.qualifier.Qualifier
 import org.koin.core.qualifier.named
 import org.koin.dsl.module
 import org.nigao.zhihu_lite.data.FeedRepository
@@ -17,8 +16,8 @@ import org.nigao.zhihu_lite.model.FeedItem
 import org.nigao.zhihu_lite.network.FeedApi
 import org.nigao.zhihu_lite.network.KtorFeedApi
 import org.nigao.zhihu_lite.network.WebviewFeedApi
-import org.nigao.zhihu_lite.ui.FeedViewModel
-import org.nigao.zhihu_lite.ui.QuestionViewModel
+import org.nigao.zhihu_lite.ui.MainFeed.FeedViewModel
+import org.nigao.zhihu_lite.ui.QuestionFeed.QuestionViewModel
 
 val NATIVE_API = named("native_api")
 val WEBVIEW_API = named("webview_api")

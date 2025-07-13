@@ -1,18 +1,14 @@
-package org.nigao.zhihu_lite.ui
+package org.nigao.zhihu_lite.ui.MainFeed
 
-import androidx.annotation.ColorLong
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -22,7 +18,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
@@ -31,13 +26,9 @@ import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 import org.koin.core.parameter.parametersOf
 import org.koin.compose.viewmodel.koinViewModel
-import org.nigao.zhihu_lite.Routes
 import org.nigao.zhihu_lite.model.FeedItem
 import org.nigao.zhihu_lite.ui.commonUi.ImageGallery
 import org.nigao.zhihu_lite.ui.commonUi.InfiniteFeedList
-import org.nigao.zhihu_lite.utils.CoilImageLoader
-import org.nigao.zhihu_lite.utils.HtmlToComposeUi
-import org.nigao.zhihu_lite.utils.ImageLoader
 import zhihulite.composeapp.generated.resources.Res
 import zhihulite.composeapp.generated.resources.avatar_placeholder
 import zhihulite.composeapp.generated.resources.interaction_count

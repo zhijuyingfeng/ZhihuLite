@@ -1,4 +1,4 @@
-package org.nigao.zhihu_lite.ui
+package org.nigao.zhihu_lite.ui.MainFeed
 
 
 import androidx.lifecycle.ViewModel

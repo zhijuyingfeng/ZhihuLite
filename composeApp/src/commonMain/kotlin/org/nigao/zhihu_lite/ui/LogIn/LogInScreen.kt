@@ -1,4 +1,4 @@
-package org.nigao.zhihu_lite.ui
+package org.nigao.zhihu_lite.ui.LogIn
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
