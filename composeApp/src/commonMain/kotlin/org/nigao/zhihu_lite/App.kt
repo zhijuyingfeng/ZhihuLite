@@ -25,7 +25,7 @@ import org.nigao.zhihu_lite.utils.auth.LogInManager
 object Routes {
     const val LOG_IN = "log_in"
     const val MAIN_FEED = "main_feed"
-    const val QUESTION_DETAIL = "question_detail/{question_id}"
+    const val QUESTION_DETAIL = "question_detail/{question_id}/{answer_id}"
 }
 
 data class NavExtra(
@@ -63,15 +63,23 @@ fun App(
                     arguments = listOf(
                         navArgument("question_id") {
                             type = NavType.StringType
-                    })
+                        },
+                        navArgument("answer_id") {
+                            type = NavType.StringType
+                        },
+                    )
                 ) { backStackEntry ->
                     val questionId = backStackEntry.arguments?.read {
                         getString("question_id")
                     }
+                    val answerId = backStackEntry.arguments?.read {
+                    getString("answer_id")
+                }
                     require(questionId?.isNotBlank() == true)
                     QuestionFeedScreen(
                         navController = navController,
-                        questionId = questionId
+                        questionId = questionId,
+                        answerId = answerId
                     )
                 }
             }

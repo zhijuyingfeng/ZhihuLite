@@ -12,7 +12,7 @@ class FeedRepository(
     private val initialUrl: String,
     private val feedApi: FeedApi,
     private val feedStorage: FeedStorage,
-    val initialItems: List<FeedItem> = emptyList(),
+    private val initialItems: List<FeedItem> = emptyList(),
 ) {
     private val scope = CoroutineScope(SupervisorJob())
     private var lastResponse: FeedResponse? = null
@@ -25,7 +25,9 @@ class FeedRepository(
 
     fun initialize() {
         scope.launch {
-            getInitialItems()
+            if (initialItems.isEmpty()) {
+                getInitialItems()
+            }
         }
     }
 
@@ -37,6 +39,7 @@ class FeedRepository(
             val feedItems = parseFeedItems(response)
             feedStorage.appendFeedItems(feedItems)
             lastResponse = response
+            FeedItemRepository.putAll(feedItems)
         }
     }
 
@@ -44,12 +47,15 @@ class FeedRepository(
         lastResponse = feedApi.getFeedResponse(initialUrl)
         val feedItems = parseFeedItems(lastResponse)
         feedStorage.appendFeedItems(feedItems)
+
+        FeedItemRepository.putAll(feedItems)
     }
 
     suspend fun refreshItems() {
         lastResponse = feedApi.getFeedResponse(initialUrl)
         val feedItems = parseFeedItems(lastResponse)
         feedStorage.refreshFeedItems(feedItems)
+        FeedItemRepository.putAll(feedItems)
     }
 
     fun getFeedItems(): Flow<List<FeedItem>> = feedStorage.getFeedItems()

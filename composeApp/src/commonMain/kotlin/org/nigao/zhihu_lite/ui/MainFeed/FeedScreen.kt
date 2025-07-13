@@ -71,7 +71,7 @@ fun FeedItemCard(
             style = MaterialTheme.typography.titleMedium,
             modifier = Modifier.padding(bottom = 4.dp).clickable {
                 require(feedItem.target?.question?.id?.isNotBlank() == true)
-                navController.navigate("question_detail/${feedItem.target.question.id}")
+                navController.navigate("question_detail/${feedItem.target.question.id}/${feedItem.target.id}")
             }
         )
         Row(
