@@ -1,4 +1,8 @@
 <resources>
     <string name="app_name">知乎Lite</string>
-    <string name="interaction_count">%1$d 赞同 ‧ %2$d 评论</string>
+    <string name="votes_up_count">%1$d 赞同</string>
+    <string name="comment_count">%1$d 评论</string>
+    <string name="edit_time">编辑于 %1$s</string>
+    <string name="votes_up">赞同</string>
+    <string name="votes_down">反对</string>
 </resources>

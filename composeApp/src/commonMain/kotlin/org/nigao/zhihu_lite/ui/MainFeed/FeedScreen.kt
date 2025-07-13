@@ -14,6 +14,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -22,6 +23,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import coil3.compose.AsyncImage
+import io.github.aakira.napier.Napier
+import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 import org.koin.core.parameter.parametersOf
@@ -31,7 +34,11 @@ import org.nigao.zhihu_lite.ui.commonUi.ImageGallery
 import org.nigao.zhihu_lite.ui.commonUi.InfiniteFeedList
 import zhihulite.composeapp.generated.resources.Res
 import zhihulite.composeapp.generated.resources.avatar_placeholder
-import zhihulite.composeapp.generated.resources.interaction_count
+import zhihulite.composeapp.generated.resources.votes_up_count
+import kotlinx.datetime.Instant
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
+import zhihulite.composeapp.generated.resources.comment_count
 
 @Composable
 fun FeedScreen(
@@ -46,21 +53,34 @@ fun FeedScreen(
             ) }
     )
     val feedItems by viewModel.feedItems.collectAsStateWithLifecycle()
+    val scope = rememberCoroutineScope()
 
     InfiniteFeedList(
         feedItems = feedItems,
         getMoreItems = { viewModel.getMoreItems() },
         content = { feedItem, modifier ->
-            FeedItemCard(feedItem, navController, modifier)
+            FeedItemCard(
+                feedItem = feedItem,
+                modifier = modifier.clickable {
+                    require(feedItem.target?.question?.id?.isNotBlank() == true)
+                    navController.navigate("question_detail/${feedItem.target.question.id}/${feedItem.target.id}")
+                })
         },
-        modifier = modifier
+        modifier = modifier,
+        onCellShow = { index ->
+            val item = feedItems[index]
+            Napier.i("Cell show. id: ${item.target?.id}, title: ${item.target?.question?.title}")
+            scope.launch {
+                viewModel.eventReporter.reportShow(item)
+                viewModel.eventReporter.reportRead(item)
+            }
+        }
     )
 }
 
 @Composable
 fun FeedItemCard(
     feedItem: FeedItem,
-    navController: NavController,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -69,10 +89,7 @@ fun FeedItemCard(
         Text(
             text = feedItem.target?.question?.title.toString(),
             style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier.padding(bottom = 4.dp).clickable {
-                require(feedItem.target?.question?.id?.isNotBlank() == true)
-                navController.navigate("question_detail/${feedItem.target.question.id}/${feedItem.target.id}")
-            }
+            modifier = Modifier.padding(bottom = 4.dp)
         )
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -104,9 +121,15 @@ fun FeedItemCard(
             )
         }
         Text(
-            text = stringResource(Res.string.interaction_count,
-                feedItem.target?.voteupCount ?: 0, feedItem.target?.commentCount ?: 0
-            ),
+            text = buildString {
+                append(stringResource(Res.string.votes_up_count, feedItem.target?.voteupCount ?: 0))
+                append(" ‧ ")
+                append(stringResource(Res.string.comment_count, feedItem.target?.commentCount ?: 0))
+                if (feedItem.target != null) {
+                    append(" ‧ ")
+                    append(formatTimestamp(feedItem.target.updatedTime))
+                }
+            },
             style = MaterialTheme.typography.labelMedium,
             color = Color.Gray,
             modifier = Modifier.padding(top = 4.dp),
@@ -118,3 +141,18 @@ fun FeedItemCard(
         )
     }
 }
+
+private fun formatTimestamp(timestamp: Long): String {
+    val instant = Instant.fromEpochSeconds(timestamp)
+    val beijingTimeZone = TimeZone.of("Asia/Shanghai")
+    val dateTime = instant.toLocalDateTime(beijingTimeZone)
+    return buildString {
+        append(dateTime.year)
+        append('-')
+        append(dateTime.monthNumber.padToTwoDigits())
+        append('-')
+        append(dateTime.dayOfMonth.padToTwoDigits())
+    }
+}
+
+private fun Int.padToTwoDigits() = toString().padStart(2, '0')

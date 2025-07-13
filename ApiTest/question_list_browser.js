@@ -1177,5 +1177,5 @@ function request_feed_sync(uri) {
     return JSON.parse(xhr.responseText);
 }
 
-var path = '/api/v4/questions/25405208/feeds?cursor=dda20c6d67a6b35fe20efd64f226efc5&limit=3&offset=1&order=default&platform=desktop&session_id=1751389997040434497&ws_qiangzhisafe=0'
+var path = '/api/v4/comment_v5/answers/1926945208785952870/root_comment?order_by=score&limit=20&offset='
 request_feed_sync(path)
