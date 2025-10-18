@@ -16,9 +16,9 @@ import org.nigao.zhihu_lite.model.FeedItem
 import org.nigao.zhihu_lite.network.FeedApi
 import org.nigao.zhihu_lite.network.KtorFeedApi
 import org.nigao.zhihu_lite.network.WebviewFeedApi
-import org.nigao.zhihu_lite.ui.MainFeed.FeedViewModel
-import org.nigao.zhihu_lite.ui.QuestionFeed.QuestionViewModel
-import org.nigao.zhihu_lite.utils.EventReporter
+import org.nigao.zhihu_lite.mainFeed.ui.FeedViewModel
+import org.nigao.zhihu_lite.answerFeed.ui.AnswerViewModel
+import org.nigao.zhihu_lite.eventReporter.EventReporter
 
 val NATIVE_API = named("native_api")
 val WEBVIEW_API = named("webview_api")
@@ -76,7 +76,7 @@ val viewModelModule = module {
     }
 
     factory { (baseUrl: String, initialItems: List<FeedItem>) ->
-        QuestionViewModel(
+        AnswerViewModel(
             feedRepository = get(WEBVIEW_API) {
                 parametersOf(baseUrl, initialItems)
             },

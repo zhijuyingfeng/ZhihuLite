@@ -17,10 +17,10 @@ import androidx.navigation.navArgument
 import androidx.savedstate.read
 import org.jetbrains.compose.ui.tooling.preview.Preview
 import org.nigao.zhihu_lite.model.Question
-import org.nigao.zhihu_lite.ui.MainFeed.FeedScreen
-import org.nigao.zhihu_lite.ui.LogIn.LogInScreen
-import org.nigao.zhihu_lite.ui.QuestionFeed.QuestionFeedScreen
-import org.nigao.zhihu_lite.utils.auth.LogInManager
+import org.nigao.zhihu_lite.mainFeed.ui.FeedScreen
+import org.nigao.zhihu_lite.login.LogInScreen
+import org.nigao.zhihu_lite.answerFeed.ui.AnswerFeedScreen
+import org.nigao.zhihu_lite.login.LogInManager
 
 object Routes {
     const val LOG_IN = "log_in"
@@ -76,7 +76,7 @@ fun App(
                     getString("answer_id")
                 }
                     require(questionId?.isNotBlank() == true)
-                    QuestionFeedScreen(
+                    AnswerFeedScreen(
                         navController = navController,
                         questionId = questionId,
                         answerId = answerId

@@ -1140,7 +1140,7 @@ function generate_zst_81(osa, osd) {
     return '3_2.0' + R(token)
 }
 
-function get_cookie_value(cookieName) {
+function get_cookie_field(keyName) {
     const cookies = document.cookie.split(';');
     
     for (let cookie of cookies) {
@@ -1152,7 +1152,7 @@ function get_cookie_value(cookieName) {
         const key = cookie.substring(0, eqPos);
         const value = cookie.substring(eqPos + 1);
 
-        if (key === cookieName) {
+        if (key === keyName) {
             return decodeURIComponent(value);
         }
     }
@@ -1161,7 +1161,7 @@ function get_cookie_value(cookieName) {
 }
 
 function request_feed_sync(uri) {
-    var d_c0 = get_cookie_value('d_c0')
+    var d_c0 = get_cookie_field('d_c0')
     var zse_93 = '101_3_3.0';
     var zse_96 = generate_zse_96(uri, d_c0);
     var host = 'www.zhihu.com';

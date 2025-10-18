@@ -7,7 +7,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.nigao.zhihu_lite.di.initKoin
-import org.nigao.zhihu_lite.utils.JsEvaluator.JsEvaluator
+import org.nigao.zhihu_lite.web.JsEvaluator
 
 class DefaultApplication: Application() {
     override fun onCreate() {
