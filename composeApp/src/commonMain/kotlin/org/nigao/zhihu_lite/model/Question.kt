@@ -24,6 +24,5 @@ data class Question(
 
 @Serializable
 data class QuestionRelationship(
-    @SerialName("is_author")
-    val isAuthor: Boolean
+    @SerialName("is_author") val isAuthor: Boolean
 )

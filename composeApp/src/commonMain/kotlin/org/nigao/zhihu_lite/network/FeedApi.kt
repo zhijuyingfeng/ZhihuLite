@@ -7,7 +7,6 @@ import io.ktor.client.request.get
 import io.ktor.client.request.headers
 import kotlinx.serialization.json.Json
 import org.nigao.zhihu_lite.model.FeedResponse
-import org.nigao.zhihu_lite.web.JsEvaluator
 import org.nigao.zhihu_lite.login.LogInManager
 import org.nigao.zhihu_lite.web.WebUtil
 
@@ -43,7 +42,7 @@ class WebviewFeedApi(): FeedApi {
     override suspend fun getFeedResponse(url: String): FeedResponse? {
         try {
             val result = WebUtil.request(path = url.removePrefix("https://$HOST")).toString()
-            Napier.i("Js executed, result: $result")
+            Napier.i("getFeedResponse: $result")
             val json = Json {
                 ignoreUnknownKeys = true
             }

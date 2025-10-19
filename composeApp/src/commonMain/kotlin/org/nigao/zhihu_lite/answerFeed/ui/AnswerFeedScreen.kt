@@ -124,7 +124,7 @@ fun AnswerCard(
                 modifier = Modifier.padding(start = 4.dp),
             )
         }
-        HtmlToComposeUi(feedItem.target?.content.toString(), imageLoader = CoilImageLoader())
+        HtmlToComposeUi(feedItem.target?.content.toString(), feedItem, imageLoader = CoilImageLoader())
         if (feedItem.target != null) {
             Text(
                 text = stringResource(

@@ -37,7 +37,7 @@ actual object WebUtil {
             xhr.setRequestHeader('x-zse-93', '101_3_3.0');
             xhr.setRequestHeader('x-zse-96', ${calculateZse96(path)});
             $setHeaderScript
-            xhr.send($jsRequestBody);
+            xhr.send(JSON.stringify($jsRequestBody));
         
             JSON.parse(xhr.responseText);
         """.trimIndent()

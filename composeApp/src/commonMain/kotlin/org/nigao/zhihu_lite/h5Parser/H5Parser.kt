@@ -27,6 +27,8 @@ import coil3.compose.AsyncImage
 import kotlinx.collections.immutable.ImmutableMap
 import kotlinx.collections.immutable.toImmutableMap
 import org.nigao.zhihu_lite.buildInfo.BuildInfo
+import org.nigao.zhihu_lite.model.FeedItem
+import org.nigao.zhihu_lite.video.ui.VideoElement
 
 /**
  * Interface for image loading that supports different platforms
@@ -88,6 +90,7 @@ sealed class HtmlNode {
 @Composable
 fun HtmlToComposeUi(
     html: String,
+    feedItem: FeedItem,
     modifier: Modifier = Modifier,
     textStyle: TextStyle = LocalTextStyle.current,
     linkStyle: SpanStyle = SpanStyle(
@@ -121,10 +124,14 @@ fun HtmlToComposeUi(
                         "ul" -> ListElement(node, textStyle, false)
                         "ol" -> ListElement(node, textStyle, true)
                         "li" -> ListItemElement(node, textStyle)
-                        "a" -> LinkElement(node, textStyle, linkStyle)
+                        "a" -> if (node.attributes["class"] == "video-box") {
+                            VideoElement(feedItem, node)
+                        } else {
+                            LinkElement(node, textStyle, linkStyle)
+                        }
                         "img" -> ImageElement(node, textStyle, imageLoader)
-                        "div" -> BlockElement(node, textStyle, linkStyle, imageLoader)
-                        else -> UnknownElement(node, textStyle, linkStyle, imageLoader)
+                        "div" -> BlockElement(feedItem, node, textStyle, linkStyle, imageLoader)
+                        else -> UnknownElement(feedItem, node, textStyle, linkStyle, imageLoader)
                     }
                 }
             }
@@ -272,6 +279,7 @@ private fun ImageElement(
 
 @Composable
 private fun BlockElement(
+    feedItem: FeedItem,
     element: HtmlNode.Element,
     baseStyle: TextStyle,
     linkStyle: SpanStyle,
@@ -292,7 +300,7 @@ private fun BlockElement(
                 is HtmlNode.Element -> {
                     when (child.tagName.lowercase()) {
                         "img" -> ImageElement(child, baseStyle, imageLoader)
-                        else -> UnknownElement(child, baseStyle, linkStyle, imageLoader)
+                        else -> UnknownElement(feedItem, child, baseStyle, linkStyle, imageLoader)
                     }
                 }
             }
@@ -302,6 +310,7 @@ private fun BlockElement(
 
 @Composable
 private fun UnknownElement(
+    feedItem: FeedItem,
     element: HtmlNode.Element,
     baseStyle: TextStyle,
     linkStyle: SpanStyle,
@@ -327,6 +336,7 @@ private fun UnknownElement(
                 is HtmlNode.TextNode -> Text(text = child.content, style = baseStyle)
                 is HtmlNode.Element -> HtmlToComposeUi(
                     html = child.toHtml(),
+                    feedItem = feedItem,
                     textStyle = baseStyle,
                     linkStyle = linkStyle,
                     imageLoader = imageLoader

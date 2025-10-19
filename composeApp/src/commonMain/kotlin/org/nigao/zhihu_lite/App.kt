@@ -21,6 +21,7 @@ import org.nigao.zhihu_lite.mainFeed.ui.FeedScreen
 import org.nigao.zhihu_lite.login.LogInScreen
 import org.nigao.zhihu_lite.answerFeed.ui.AnswerFeedScreen
 import org.nigao.zhihu_lite.login.LogInManager
+import org.nigao.zhihu_lite.video.ui.TestVideoPlayer
 
 object Routes {
     const val LOG_IN = "log_in"

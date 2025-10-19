@@ -19,6 +19,10 @@ import org.nigao.zhihu_lite.network.WebviewFeedApi
 import org.nigao.zhihu_lite.mainFeed.ui.FeedViewModel
 import org.nigao.zhihu_lite.answerFeed.ui.AnswerViewModel
 import org.nigao.zhihu_lite.eventReporter.EventReporter
+import org.nigao.zhihu_lite.h5Parser.HtmlNode
+import org.nigao.zhihu_lite.video.network.VideoPlayInfoApi
+import org.nigao.zhihu_lite.video.network.VideoPlayInfoWebApi
+import org.nigao.zhihu_lite.video.ui.VideoElementViewModel
 
 val NATIVE_API = named("native_api")
 val WEBVIEW_API = named("webview_api")
@@ -36,6 +40,7 @@ val dataModule = module {
 
     single<FeedApi>(NATIVE_API) { KtorFeedApi(get()) }
     single<FeedApi>(WEBVIEW_API) { WebviewFeedApi() }
+    single<VideoPlayInfoApi> { VideoPlayInfoWebApi() }
     single<EventReporter> { EventReporter(get()) }
 
     factory<FeedStorage> {
@@ -59,10 +64,6 @@ val dataModule = module {
             initialItems = initialItems,
         )
     }
-
-    factory(NATIVE_API) {
-
-    }
 }
 
 val viewModelModule = module {
@@ -81,6 +82,14 @@ val viewModelModule = module {
                 parametersOf(baseUrl, initialItems)
             },
             eventReporter = get()
+        )
+    }
+
+    factory { (feedItem: FeedItem, element: HtmlNode.Element) ->
+        VideoElementViewModel(
+            feedItem = feedItem,
+            element = element,
+            api = get()
         )
     }
 }
