@@ -16,17 +16,15 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import androidx.savedstate.read
+import com.nigao.gaia.GaiaEvent
+import com.nigao.gaia.GaiaEventManager
 import org.nigao.zhihuLite.model.Question
 import org.nigao.zhihuLite.mainFeed.ui.FeedScreen
 import org.nigao.zhihuLite.login.LogInScreen
 import org.nigao.zhihuLite.answerFeed.ui.AnswerFeedScreen
 import org.nigao.zhihuLite.login.LogInManager
-
-object Routes {
-    const val LOG_IN = "log_in"
-    const val MAIN_FEED = "main_feed"
-    const val QUESTION_DETAIL = "question_detail/{question_id}/{answer_id}"
-}
+import org.nigao.zhihuLite.registerRoute.RouteRegisterManager
+import org.nigao.zhihuLite.registerRoute.Routes
 
 data class NavExtra(
     val question: Question,
@@ -38,49 +36,23 @@ fun App(
     modifier: Modifier = Modifier,
     navController: NavHostController = rememberNavController()
 ) {
+    GaiaEventManager.start(GaiaEvent(key = "register_route"))
     MaterialTheme {
         Scaffold(
             modifier = Modifier.fillMaxSize().statusBarsPadding()
-        ) {
+        ) { contentPadding ->
+            contentPadding
             NavHost(
                 navController = navController,
                 startDestination = if (LogInManager.isLoggedIn()) Routes.MAIN_FEED else Routes.LOG_IN
             ) {
-                composable(route = Routes.LOG_IN) {
-                    LogInScreen(
-                        navController = navController,
-                        modifier = Modifier.fillMaxSize()
-                    )
-                }
-                composable(route = Routes.MAIN_FEED) {
-                    FeedScreen(
-                        navController = navController,
-                        modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainer)
-                    )
-                }
-                composable(
-                    route = Routes.QUESTION_DETAIL,
-                    arguments = listOf(
-                        navArgument("question_id") {
-                            type = NavType.StringType
-                        },
-                        navArgument("answer_id") {
-                            type = NavType.StringType
-                        },
-                    )
-                ) { backStackEntry ->
-                    val questionId = backStackEntry.arguments?.read {
-                        getString("question_id")
+                RouteRegisterManager.routeRegistries().forEach { routeRegistry ->
+                    composable(
+                        route = routeRegistry.route,
+                        arguments = routeRegistry.arguments,
+                    ) { backStackEntry ->
+                        routeRegistry.content(navController, backStackEntry)
                     }
-                    val answerId = backStackEntry.arguments?.read {
-                    getString("answer_id")
-                }
-                    require(questionId?.isNotBlank() == true)
-                    AnswerFeedScreen(
-                        navController = navController,
-                        questionId = questionId,
-                        answerId = answerId
-                    )
                 }
             }
         }

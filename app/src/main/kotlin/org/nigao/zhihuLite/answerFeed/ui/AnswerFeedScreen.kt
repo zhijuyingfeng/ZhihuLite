@@ -1,5 +1,6 @@
 package org.nigao.zhihuLite.answerFeed.ui
 
+import android.provider.Settings.Global.getString
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -40,6 +41,10 @@ import androidx.navigation.NavController
 import coil3.compose.AsyncImage
 import io.github.aakira.napier.Napier
 import androidx.compose.runtime.getValue
+import androidx.navigation.NavType
+import androidx.navigation.navArgument
+import androidx.savedstate.read
+import com.nigao.gaia.GaiaListen
 import kotlinx.coroutines.launch
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.Instant
@@ -53,6 +58,9 @@ import org.nigao.zhihuLite.data.FeedItemRepository
 import org.nigao.zhihuLite.h5Parser.CoilImageLoader
 import org.nigao.zhihuLite.h5Parser.HtmlToComposeUi
 import org.nigao.zhihuLite.model.FeedItem
+import org.nigao.zhihuLite.registerRoute.RouteRegisterManager
+import org.nigao.zhihuLite.registerRoute.RouteRegistry
+import org.nigao.zhihuLite.registerRoute.Routes
 import kotlin.time.ExperimentalTime
 
 @Composable
@@ -231,3 +239,34 @@ fun formatTimestamp(timestamp: Long): String {
 }
 
 private fun Int.padToTwoDigits() = toString().padStart(2, '0')
+
+@GaiaListen(key="register_route")
+fun RegisterAnswerFeed() {
+    RouteRegisterManager.register(
+        RouteRegistry(
+            route = Routes.QUESTION_DETAIL,
+            arguments = listOf(
+                navArgument("question_id") {
+                    type = NavType.StringType
+                },
+                navArgument("answer_id") {
+                    type = NavType.StringType
+                },
+            ),
+            content = { navController, backStackEntry ->
+                val questionId = backStackEntry.arguments?.read {
+                    getString("question_id")
+                }
+                val answerId = backStackEntry.arguments?.read {
+                    getString("answer_id")
+                }
+                require(questionId?.isNotBlank() == true)
+                AnswerFeedScreen(
+                    navController = navController,
+                    questionId = questionId,
+                    answerId = answerId
+                )
+            }
+        )
+    )
+}

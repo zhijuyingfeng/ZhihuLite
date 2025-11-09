@@ -4,6 +4,7 @@ plugins {
     alias(libs.plugins.kotlinAndroid)
     alias(libs.plugins.composeCompiler)
     alias(libs.plugins.serialization)
+    id("com.google.devtools.ksp")
 }
 android {
     namespace = "org.nigao.zhihuLite"
@@ -25,6 +26,13 @@ android {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
+
+    sourceSets {
+        getByName("main") {
+            java.srcDirs("build/generated/ksp/src/main/kotlin")
+        }
+    }
+
     buildTypes {
         getByName("release") {
             isMinifyEnabled = false
@@ -74,4 +82,10 @@ dependencies {
     implementation(libs.multiplatform.settings.no.arg)
     implementation(libs.datetime)
     implementation(libs.androidx.material3)
+    implementation(project(":app:gaia"))
+    ksp(project(":app:gaia"))
+}
+
+android.sourceSets.all {
+    java.srcDirs("build/generated/$name/kotlin")
 }

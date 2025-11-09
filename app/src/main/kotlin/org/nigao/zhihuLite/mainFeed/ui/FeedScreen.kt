@@ -1,9 +1,11 @@
 package org.nigao.zhihuLite.mainFeed.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -28,6 +30,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import com.nigao.gaia.GaiaListen
 import kotlinx.datetime.Instant
 import kotlinx.datetime.toLocalDateTime
 import org.koin.compose.viewmodel.koinViewModel
@@ -36,6 +39,9 @@ import org.nigao.zhihuLite.R
 import org.nigao.zhihuLite.common_ui.ImageGallery
 import org.nigao.zhihuLite.common_ui.InfiniteFeedList
 import org.nigao.zhihuLite.model.FeedItem
+import org.nigao.zhihuLite.registerRoute.RouteRegisterManager
+import org.nigao.zhihuLite.registerRoute.RouteRegistry
+import org.nigao.zhihuLite.registerRoute.Routes
 
 @Composable
 fun FeedScreen(
@@ -153,3 +159,19 @@ private fun formatTimestamp(timestamp: Long): String {
 }
 
 private fun Int.padToTwoDigits() = toString().padStart(2, '0')
+
+@GaiaListen(key="register_route")
+fun RegisterMainFeedRoute() {
+    RouteRegisterManager.register(
+        RouteRegistry(
+            route = Routes.MAIN_FEED,
+            arguments = emptyList(),
+            content = { navController, _ ->
+                FeedScreen(
+                    navController = navController,
+                    modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainer)
+                )
+            }
+        )
+    )
+}
