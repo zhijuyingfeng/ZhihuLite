@@ -3,9 +3,8 @@ package org.nigao.zhihuLite.common_ui
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -26,10 +25,10 @@ fun InfiniteFeedList(
     modifier: Modifier = Modifier,
     onCellShow: (index: Int) -> Unit = {},
 ) {
-    val gridState = rememberLazyGridState()
+    val state = rememberLazyListState()
     val isNearBottom by remember {
         derivedStateOf {
-            val layoutInfo = gridState.layoutInfo
+            val layoutInfo = state.layoutInfo
             val totalItemsCount = layoutInfo.totalItemsCount
             val lastVisibleItem = layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
 
@@ -40,9 +39,8 @@ fun InfiniteFeedList(
         if (isNearBottom) getMoreItems()
     }
 
-    LazyVerticalGrid(
-        columns = GridCells.Fixed(1),
-        state = gridState,
+    LazyColumn(
+        state = state,
         verticalArrangement = Arrangement.spacedBy(10.dp),
         contentPadding = PaddingValues(start = 16.dp, end = 16.dp),
         modifier = modifier
@@ -54,8 +52,8 @@ fun InfiniteFeedList(
             }
         ) { index ->
             val item = feedItems[index]
-            LaunchedEffect(gridState) {
-                snapshotFlow { gridState.layoutInfo.visibleItemsInfo }
+            LaunchedEffect(state) {
+                snapshotFlow { state.layoutInfo.visibleItemsInfo }
                     .map {  visibleItems ->
                         visibleItems.any {
                             it.key == item.target?.id

@@ -17,7 +17,7 @@ interface FeedApi {
 class KtorFeedApi(
     private val client: HttpClient
 ): FeedApi {
-    private val HOST = "https://www.zhihu.com/"
+    private val host = "https://www.zhihu.com/"
     override suspend fun getFeedResponse(url: String): FeedResponse? {
         return try {
             val response = client.get(url) {
@@ -25,7 +25,7 @@ class KtorFeedApi(
                     append("Accept-Charset", "utf-8")
                     append("User-Agent", "Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0")
                     append("Cookie", LogInManager.cookie())
-                    append("Referer", HOST)
+                    append("Referer", host)
                 }
             }
             val body = response.body<FeedResponse>()
@@ -38,10 +38,10 @@ class KtorFeedApi(
 }
 
 class WebviewFeedApi(): FeedApi {
-    private val HOST = "www.zhihu.com"
+    private val host = "www.zhihu.com"
     override suspend fun getFeedResponse(url: String): FeedResponse? {
         try {
-            val result = WebUtil.request(path = url.removePrefix("https://$HOST")).toString()
+            val result = WebUtil.request(path = url.removePrefix("https://$host")).toString()
             Napier.i("getFeedResponse: $result")
             val json = Json {
                 ignoreUnknownKeys = true
