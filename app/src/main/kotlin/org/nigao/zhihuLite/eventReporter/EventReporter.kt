@@ -11,6 +11,7 @@ import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpHeaders
 import org.nigao.zhihuLite.login.LogInManager
 import org.nigao.zhihuLite.model.FeedItem
+import org.nigao.zhihuLite.network.sharedHttpClient
 
 class EventReporter(
     private val httpClient: HttpClient
@@ -79,3 +80,5 @@ class EventReporter(
         }
     }
 }
+
+val sharedEventReporter = EventReporter(sharedHttpClient)

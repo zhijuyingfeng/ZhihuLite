@@ -5,4 +5,5 @@
     <string name="edit_time">编辑于 %1$s</string>
     <string name="votes_up">赞同</string>
     <string name="votes_down">反对</string>
+    <string name="loading_more_hint">加载中</string>
 </resources>

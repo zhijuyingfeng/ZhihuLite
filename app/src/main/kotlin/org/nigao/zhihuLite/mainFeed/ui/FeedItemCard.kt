@@ -32,7 +32,7 @@ fun FeedItemCard(
     modifier: Modifier = Modifier
 ) {
     Column(
-        modifier = modifier
+        modifier = modifier.padding(horizontal = 16.dp)
     ) {
         Text(
             text = uiState.question,

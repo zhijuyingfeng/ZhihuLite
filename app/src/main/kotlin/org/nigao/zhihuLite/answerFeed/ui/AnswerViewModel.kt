@@ -5,16 +5,16 @@ import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.stateIn
 import org.nigao.zhihuLite.data.FeedRepository
-import org.nigao.zhihuLite.eventReporter.EventReporter
+import org.nigao.zhihuLite.eventReporter.sharedEventReporter
 
 class AnswerViewModel(
     private val feedRepository: FeedRepository,
-    val eventReporter: EventReporter,
 ): ViewModel() {
     init {
         feedRepository.initialize()
     }
 
+    val eventReporter = sharedEventReporter
     val feedItems = feedRepository.getFeedItems().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     suspend fun getMoreItems() = feedRepository.getMoreItems()

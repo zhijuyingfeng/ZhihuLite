@@ -5,4 +5,5 @@
     <string name="edit_time">Edited at %1$s</string>
     <string name="votes_up">Votes Up</string>
     <string name="votes_down">Votes Down</string>
+    <string name="loading_more_hint">Loading</string>
 </resources>
