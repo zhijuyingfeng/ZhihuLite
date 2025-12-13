@@ -7,7 +7,6 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import org.nigao.zhihuLite.h5Parser.HtmlNode
-import org.nigao.zhihuLite.model.FeedItem
 import org.nigao.zhihuLite.video.model.VideoPlayInfo
 import org.nigao.zhihuLite.video.network.VideoPlayInfoApi
 
@@ -19,7 +18,7 @@ sealed class VideoPlayInfoState {
 }
 
 class VideoElementViewModel (
-    val feedItem: FeedItem,
+    val answerId: String?,
     val element: HtmlNode.Element,
     private val api: VideoPlayInfoApi
 ): ViewModel() {
@@ -29,7 +28,6 @@ class VideoElementViewModel (
 
     suspend fun getPlayInfo() {
         val videoId = element.attributes["data-lens-id"]
-        val answerId = feedItem.target?.id
 
         require(videoId?.isNotBlank() == true)
         require(answerId?.isNotBlank() == true)

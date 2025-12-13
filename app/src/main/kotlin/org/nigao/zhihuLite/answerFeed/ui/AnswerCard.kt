@@ -30,7 +30,7 @@ import kotlin.time.ExperimentalTime
 
 @Composable
 fun AnswerCard(
-    feedItem: FeedItem,
+    uiState: AnswerCardUiState,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -41,30 +41,30 @@ fun AnswerCard(
             horizontalArrangement = Arrangement.Start
         ) {
             AsyncImage(
-                model = feedItem.target?.author?.avatarUrl,
-                contentDescription = feedItem.target?.author?.name,
+                model = uiState.avatarUrl,
+                contentDescription = null,
                 placeholder = painterResource(R.drawable.avatar_placeholder),
                 modifier = Modifier.clip(CircleShape).size(20.dp)
             )
             Text(
-                text = feedItem.target?.author?.name.toString(),
+                text = uiState.authorName,
                 style = MaterialTheme.typography.labelMedium,
                 color = Color.Gray,
                 modifier = Modifier.padding(start = 4.dp),
             )
         }
-        HtmlToComposeUi(feedItem.target?.content.toString(), feedItem, imageLoader = CoilImageLoader())
-        if (feedItem.target != null) {
+        HtmlToComposeUi(uiState.content, uiState.answerId, imageLoader = CoilImageLoader())
+        if (uiState.updatedTimestamp > 0) {
             Text(
                 text = stringResource(
                     R.string.edit_time,
-                    formatTimestamp(feedItem.target.updatedTime)
+                    formatTimestamp(uiState.updatedTimestamp)
                 ),
                 style = MaterialTheme.typography.labelMedium,
                 color = Color.Gray,
             )
         }
-        ActionBar(feedItem)
+        ActionBar(uiState.actionBarUiState)
         HorizontalDivider(
             thickness = 1.dp,
             color = Color.LightGray,

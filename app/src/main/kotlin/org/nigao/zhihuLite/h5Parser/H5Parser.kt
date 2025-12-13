@@ -1,13 +1,22 @@
 package org.nigao.zhihuLite.h5Parser
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BrokenImage
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Icon
+import androidx.compose.material3.LocalTextStyle
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -27,6 +36,7 @@ import coil3.compose.AsyncImage
 import kotlinx.collections.immutable.ImmutableMap
 import kotlinx.collections.immutable.toImmutableMap
 import org.nigao.zhihuLite.BuildConfig
+import org.nigao.zhihuLite.basicTypeExtension.noRippleClickable
 import org.nigao.zhihuLite.model.FeedItem
 import org.nigao.zhihuLite.video.ui.VideoElement
 
@@ -90,7 +100,7 @@ sealed class HtmlNode {
 @Composable
 fun HtmlToComposeUi(
     html: String,
-    feedItem: FeedItem,
+    answerId: String?,
     modifier: Modifier = Modifier,
     textStyle: TextStyle = LocalTextStyle.current,
     linkStyle: SpanStyle = SpanStyle(
@@ -125,13 +135,16 @@ fun HtmlToComposeUi(
                         "ol" -> ListElement(node, textStyle, true)
                         "li" -> ListItemElement(node, textStyle)
                         "a" -> if (node.attributes["class"] == "video-box") {
-                            VideoElement(feedItem, node)
+                            VideoElement(
+                                answerId = answerId,
+                                element = node
+                            )
                         } else {
                             LinkElement(node, textStyle, linkStyle)
                         }
                         "img" -> ImageElement(node, textStyle, imageLoader)
-                        "div" -> BlockElement(feedItem, node, textStyle, linkStyle, imageLoader)
-                        else -> UnknownElement(feedItem, node, textStyle, linkStyle, imageLoader)
+                        "div" -> BlockElement(answerId, node, textStyle, linkStyle, imageLoader)
+                        else -> UnknownElement(answerId, node, textStyle, linkStyle, imageLoader)
                     }
                 }
             }
@@ -279,7 +292,7 @@ private fun ImageElement(
 
 @Composable
 private fun BlockElement(
-    feedItem: FeedItem,
+    answerId: String?,
     element: HtmlNode.Element,
     baseStyle: TextStyle,
     linkStyle: SpanStyle,
@@ -300,7 +313,7 @@ private fun BlockElement(
                 is HtmlNode.Element -> {
                     when (child.tagName.lowercase()) {
                         "img" -> ImageElement(child, baseStyle, imageLoader)
-                        else -> UnknownElement(feedItem, child, baseStyle, linkStyle, imageLoader)
+                        else -> UnknownElement(answerId, child, baseStyle, linkStyle, imageLoader)
                     }
                 }
             }
@@ -310,7 +323,7 @@ private fun BlockElement(
 
 @Composable
 private fun UnknownElement(
-    feedItem: FeedItem,
+    answerId: String?,
     element: HtmlNode.Element,
     baseStyle: TextStyle,
     linkStyle: SpanStyle,
@@ -336,7 +349,7 @@ private fun UnknownElement(
                 is HtmlNode.TextNode -> Text(text = child.content, style = baseStyle)
                 is HtmlNode.Element -> HtmlToComposeUi(
                     html = child.toHtml(),
-                    feedItem = feedItem,
+                    answerId = answerId,
                     textStyle = baseStyle,
                     linkStyle = linkStyle,
                     imageLoader = imageLoader
@@ -456,7 +469,7 @@ fun ClickableText(
     Text(
         text = text,
         style = style,
-        modifier = modifier.clickable { onClick(0) }
+        modifier = modifier.noRippleClickable { onClick(0) }
     )
 }
 

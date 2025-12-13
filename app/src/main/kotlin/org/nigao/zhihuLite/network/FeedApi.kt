@@ -3,8 +3,11 @@ package org.nigao.zhihuLite.network
 import io.github.aakira.napier.Napier
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
+import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.request.get
 import io.ktor.client.request.headers
+import io.ktor.http.ContentType
+import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.json.Json
 import org.nigao.zhihuLite.model.FeedResponse
 import org.nigao.zhihuLite.login.LogInManager
@@ -43,13 +46,23 @@ class WebviewFeedApi(): FeedApi {
         try {
             val result = WebUtil.request(path = url.removePrefix("https://$host")).toString()
             Napier.i("getFeedResponse: $result")
-            val json = Json {
-                ignoreUnknownKeys = true
-            }
-            return json.decodeFromString<FeedResponse>(result)
+            return sharedJson.decodeFromString<FeedResponse>(result)
         } catch (e: Exception) {
             e.printStackTrace()
             return null
         }
     }
 }
+
+val sharedJson = Json { ignoreUnknownKeys = true }
+
+val sharedHttpClient = HttpClient {
+    install(ContentNegotiation) {
+        // TODO Fix API so it serves application/json
+        json(sharedJson, contentType = ContentType.Any)
+    }
+}
+
+val sharedKtorFeedApi = KtorFeedApi(sharedHttpClient)
+
+val sharedWebviewFeedApi = WebviewFeedApi()

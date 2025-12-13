@@ -5,4 +5,8 @@
     <string name="edit_time">Edited at %1$s</string>
     <string name="votes_up">Votes Up</string>
     <string name="votes_down">Votes Down</string>
+    <string name="feed_loading">Loading</string>
+    <string name="list_footer_loading">Loading</string>
+    <string name="list_footer_failed">Network Failed. Try again</string>
+    <string name="list_footer_no_more">No more data</string>
 </resources>

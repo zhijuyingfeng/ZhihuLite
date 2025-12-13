@@ -13,7 +13,7 @@ fun TestVideoPlayer() {
     val feedItem = mockFeedItem()
     HtmlToComposeUi(
         html = feedItem.target?.content.toString(),
-        feedItem = feedItem,
+        answerId = "1952510213304334301",
         modifier = Modifier.fillMaxSize(),
     )
 }

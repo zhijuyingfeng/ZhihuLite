@@ -5,4 +5,8 @@
     <string name="edit_time">编辑于 %1$s</string>
     <string name="votes_up">赞同</string>
     <string name="votes_down">反对</string>
+    <string name="feed_loading">加载中</string>
+    <string name="list_footer_loading">努力加载中</string>
+    <string name="list_footer_failed">网络错误，请重试</string>
+    <string name="list_footer_no_more">暂无更多数据</string>
 </resources>

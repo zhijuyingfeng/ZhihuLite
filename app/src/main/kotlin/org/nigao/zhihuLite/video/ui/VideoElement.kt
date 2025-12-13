@@ -22,16 +22,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import coil3.compose.AsyncImage
 import kotlinx.coroutines.launch
-import org.koin.compose.viewmodel.koinViewModel
-import org.koin.core.parameter.parametersOf
+import org.nigao.zhihuLite.basicTypeExtension.noRippleClickable
 import org.nigao.zhihuLite.h5Parser.HtmlNode
 import org.nigao.zhihuLite.model.FeedItem
 
 @Composable
 fun VideoElement(
-    feedItem: FeedItem,
+    answerId: String?,
     element: HtmlNode.Element,
     modifier: Modifier = Modifier
 ) {
@@ -43,11 +43,12 @@ fun VideoElement(
     var coverClicked by remember {mutableStateOf(false) }
     var isVideoLoading by remember {mutableStateOf(false) }
 
-    val viewModel: VideoElementViewModel = koinViewModel<VideoElementViewModel> (
+    val viewModel: VideoElementViewModel = viewModel(
         key = element.attributes["data-lens-id"],
-        parameters = {
-            parametersOf(feedItem, element)
-        }
+        factory = VideoElementViewModelFactory(
+            answerId = answerId,
+            element = element
+        )
     )
     val  videoPlayInfoState by viewModel.playInfoState.collectAsStateWithLifecycle()
 
@@ -63,7 +64,7 @@ fun VideoElement(
             Box(
                 modifier = Modifier
                     .matchParentSize()
-                    .clickable {
+                    .noRippleClickable {
                         coverClicked = true
                         scope.launch {
                             viewModel.getPlayInfo()

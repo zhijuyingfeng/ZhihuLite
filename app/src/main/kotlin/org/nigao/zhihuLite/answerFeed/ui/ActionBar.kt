@@ -32,7 +32,7 @@ import org.nigao.zhihuLite.model.FeedItem
 
 @Composable
 fun ActionBar(
-    feedItem: FeedItem,
+    uiState: ActionBarUiState,
     modifier: Modifier = Modifier
 ) {
     val buttonHeight = 36.dp
@@ -59,7 +59,7 @@ fun ActionBar(
                 modifier = Modifier.size(20.dp)
             )
             Text(
-                text = "${stringResource(R.string.votes_up)} ${feedItem.target?.voteupCount?.toReadableString()}",
+                text = "${stringResource(R.string.votes_up)} ${uiState.voteUpCount.toReadableString()}",
                 color = Color(0xFF2196F3),
             )
         }
@@ -69,7 +69,7 @@ fun ActionBar(
             shape = RoundedCornerShape(6.dp),
             colors = filledIconButtonColors(
                 containerColor = Color(23, 114, 246, 25),
-                contentColor = Color(0x1772f6),
+                contentColor = Color(0xff1772f6),
             ),
             modifier = Modifier.height(buttonHeight)
         ) {
@@ -95,7 +95,7 @@ fun ActionBar(
             )
             Spacer(Modifier.width(4.dp))
             Text(
-                text = stringResource(R.string.comment_count, feedItem.target?.commentCount ?: 0)
+                text = stringResource(R.string.comment_count, uiState.commentCount)
             )
         }
     }
