@@ -9,6 +9,7 @@ object Routes {
     const val LOG_IN = "log_in"
     const val MAIN_FEED = "main_feed"
     const val QUESTION_DETAIL = "question_detail/{question_id}/{answer_id}"
+    const val IMAGE_VIEWER = "image_viewer/{answer_id}?page={page}"
 }
 
 data class RouteRegistry(

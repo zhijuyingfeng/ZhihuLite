@@ -25,10 +25,22 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import org.nigao.zhihuLite.R
 import org.nigao.zhihuLite.common_ui.ImageGallery
+import org.nigao.zhihuLite.mainFeed.ui.ClickPosition.ImageThumb
+
+sealed class ClickPosition {
+    object Card: ClickPosition()
+    object Title: ClickPosition()
+    object AuthInfo: ClickPosition()
+    object Content: ClickPosition()
+    class ImageThumb(val page: Int): ClickPosition()
+    object VoteUp: ClickPosition()
+    object Comment: ClickPosition()
+}
 
 @Composable
 fun FeedItemCard(
     uiState: FeedItemCardState,
+    onClick: (position: ClickPosition) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -62,10 +74,11 @@ fun FeedItemCard(
             color = Color.DarkGray,
             modifier = Modifier.padding(top = 4.dp),
         )
-        if (uiState.imageThumbnails?.isNotEmpty() == true) {
+        uiState.imageThumbnails?.takeIf { it.isNotEmpty() }?.let {
             ImageGallery(
-                imageUrls = uiState.imageThumbnails,
+                imageUrls = it,
                 modifier = Modifier.height(160.dp).padding(top = 4.dp, bottom = 4.dp),
+                onClick = { index -> onClick(ImageThumb(index)) }
             )
         }
         Text(

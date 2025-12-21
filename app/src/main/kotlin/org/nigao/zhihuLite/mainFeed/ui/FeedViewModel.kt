@@ -55,10 +55,19 @@ class FeedViewModel(
         return feedRepository.getFeedItems().firstOrNull()?.getOrNull(index)
     }
 
-    suspend fun clickTargetRoute(index: Int): String? {
+    suspend fun clickTargetRoute(index: Int, position: ClickPosition): String? {
         val feedItem = getFeedItem(index)
-        return feedItem?.takeIf { it.target != null && it.target.question != null }?.let {
-            "question_detail/${it.target?.question?.id}/${it.target?.id}"
+        return when(position) {
+            is ClickPosition.ImageThumb -> {
+                feedItem?.target?.takeIf { it.question != null }?.let {
+                    "image_viewer/${it.id}?page=${position.page}"
+                }
+            }
+            else -> {
+                feedItem?.target?.takeIf { it.question != null }?.let {
+                    "question_detail/${it.question?.id}/${it.id}"
+                }
+            }
         }
     }
 

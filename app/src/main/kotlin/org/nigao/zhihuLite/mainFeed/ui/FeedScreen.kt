@@ -136,17 +136,22 @@ fun SuccessFeedScreen(
             count = uiState.cardStates.size,
         ) { index ->
             val cardState = uiState.cardStates[index]
+            val navigateRoute:(ClickPosition) -> Unit = { position ->
+                coroutineScope.launch {
+                    val route = viewModel.clickTargetRoute(index, position)
+                    route?.takeIf { it.isNotBlank() }?.let {
+                        navController.navigate(it)
+                        Napier.i("Route to $it")
+                    }
+                }
+            }
             FeedItemCard(
                 uiState = cardState,
+                onClick = { position ->
+                    navigateRoute.invoke(position)
+                },
                 modifier = Modifier.noRippleClickable {
-                    coroutineScope.launch {
-                        val route = viewModel.clickTargetRoute(index)
-                        route.takeIf { it?.isNotBlank() == true }
-                            ?.let {
-                                navController.navigate(it)
-                                Napier.i("Route to $it")
-                            }
-                    }
+                    navigateRoute.invoke(ClickPosition.Card)
                 }
             )
         }

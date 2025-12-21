@@ -29,7 +29,6 @@ import com.nigao.gaia.GaiaListen
 import org.nigao.zhihuLite.common_ui.FeedList
 import org.nigao.zhihuLite.common_ui.FeedListConfig
 import org.nigao.zhihuLite.common_ui.LoadMoreConfig
-import org.nigao.zhihuLite.common_ui.LoadMoreResult
 import org.nigao.zhihuLite.data.FeedItemRepository
 import org.nigao.zhihuLite.model.FeedItem
 import org.nigao.zhihuLite.registerRoute.RouteRegisterManager
@@ -57,7 +56,6 @@ fun AnswerFeedScreen(
         ),
         key = questionId
     )
-    val feedItems by viewModel.feedItems.collectAsStateWithLifecycle()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     val listState = rememberLazyListState()
