@@ -9,4 +9,5 @@
     <string name="list_footer_loading">努力加载中</string>
     <string name="list_footer_failed">网络错误，请重试</string>
     <string name="list_footer_no_more">暂无更多数据</string>
+    <string name="action_bar_share">分享</string>
 </resources>

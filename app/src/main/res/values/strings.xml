@@ -9,4 +9,5 @@
     <string name="list_footer_loading">Loading</string>
     <string name="list_footer_failed">Network Failed. Try again</string>
     <string name="list_footer_no_more">No more data</string>
+    <string name="action_bar_share">Share</string>
 </resources>

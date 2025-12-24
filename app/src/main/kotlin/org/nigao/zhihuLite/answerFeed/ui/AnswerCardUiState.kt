@@ -6,6 +6,7 @@ data class ActionBarUiState(
     val voteUpCount: Int,
     val commentCount: Int,
     val updatedTimestamp: Long = 0,
+    val answerId: String?,
 )
 
 data class AnswerCardUiState(
@@ -24,6 +25,7 @@ fun FeedItem.toAnswerCardState(): AnswerCardUiState {
             voteUpCount = target?.voteupCount ?: 0,
             commentCount = target?.commentCount ?: 0,
             updatedTimestamp = updatedTimestamp,
+            answerId = target?.id
         ),
         avatarUrl = target?.author?.avatarUrl.toString(),
         authorName = target?.author?.name.toString(),
