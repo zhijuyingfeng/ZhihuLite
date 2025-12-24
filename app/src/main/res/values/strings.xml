@@ -10,4 +10,6 @@
     <string name="list_footer_failed">Network Failed. Try again</string>
     <string name="list_footer_no_more">No more data</string>
     <string name="action_bar_share">Share</string>
+    <string name="comment_sort_type_score">Default</string>
+    <string name="comment_sort_type_timestamp">Latest</string>
 </resources>

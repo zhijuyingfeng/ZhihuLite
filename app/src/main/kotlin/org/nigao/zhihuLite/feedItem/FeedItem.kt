@@ -1,4 +1,4 @@
-package org.nigao.zhihuLite.model
+package org.nigao.zhihuLite.feedItem
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable

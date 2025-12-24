@@ -1,8 +1,6 @@
 package org.nigao.zhihuLite.answerFeed.ui
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
@@ -15,14 +13,14 @@ import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.outlined.ModeComment
 import androidx.compose.material.icons.outlined.Share
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.FilledIconButton
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButtonDefaults.filledIconButtonColors
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -35,6 +33,8 @@ import kotlinx.coroutines.launch
 import org.nigao.zhihuLite.R
 import org.nigao.zhihuLite.basicTypeExtension.noRippleClickable
 import org.nigao.zhihuLite.basicTypeExtension.toReadableString
+import org.nigao.zhihuLite.comment.CommentView
+import org.nigao.zhihuLite.common_ui.CommonPanel
 import org.nigao.zhihuLite.share.shareAnswer
 
 @Composable
@@ -45,6 +45,7 @@ fun ActionBar(
     val buttonHeight = 36.dp
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
+    var isCommentShowing by remember { mutableStateOf(false) }
 
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -95,7 +96,7 @@ fun ActionBar(
         Row (
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.height(buttonHeight)
-                .noRippleClickable{}
+                .noRippleClickable{ isCommentShowing = true }
         ) {
             Icon(
                 imageVector = Icons.Outlined.ModeComment,
@@ -136,6 +137,14 @@ fun ActionBar(
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Medium,
             )
+        }
+    }
+
+    if (isCommentShowing && uiState.answerId != null) {
+        CommonPanel(
+            onDismiss = { isCommentShowing = false },
+        ) {
+            CommentView(uiState.answerId)
         }
     }
 }

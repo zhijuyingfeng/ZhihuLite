@@ -13,11 +13,9 @@ import kotlinx.coroutines.launch
 import org.nigao.zhihuLite.common_ui.LoadMoreResult
 import org.nigao.zhihuLite.data.FeedRepository
 import org.nigao.zhihuLite.eventReporter.sharedEventReporter
-import org.nigao.zhihuLite.mainFeed.ui.FeedUiState
-import org.nigao.zhihuLite.mainFeed.ui.toFeedCardState
-import org.nigao.zhihuLite.model.FeedItem
+import org.nigao.zhihuLite.feedItem.FeedItem
 
-class AnswerViewModel(
+class AnswerFeedViewModel(
     private val feedRepository: FeedRepository,
 ): ViewModel() {
 
@@ -35,7 +33,7 @@ class AnswerViewModel(
                 .drop(1)
                 .collect { items ->
                     _uiState.value = AnswerFeedUiState(
-                        cardStates = items.map { it.toAnswerCardState() },
+                        cardStates = items.mapNotNull { it.toAnswerCardState() },
                     )
                 }
         }

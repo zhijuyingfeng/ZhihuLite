@@ -37,7 +37,6 @@ import kotlinx.collections.immutable.ImmutableMap
 import kotlinx.collections.immutable.toImmutableMap
 import org.nigao.zhihuLite.BuildConfig
 import org.nigao.zhihuLite.basicTypeExtension.noRippleClickable
-import org.nigao.zhihuLite.model.FeedItem
 import org.nigao.zhihuLite.video.ui.VideoElement
 
 /**
@@ -53,7 +52,7 @@ interface ImageLoader {
     )
 }
 
-class CoilImageLoader: ImageLoader {
+object CoilImageLoader: ImageLoader {
     @Composable
     override fun LoadImage(
         src: String,
@@ -100,8 +99,8 @@ sealed class HtmlNode {
 @Composable
 fun HtmlToComposeUi(
     html: String,
-    answerId: String?,
     modifier: Modifier = Modifier,
+    answerId: String? = null,
     textStyle: TextStyle = LocalTextStyle.current,
     linkStyle: SpanStyle = SpanStyle(
         color = MaterialTheme.colorScheme.primary,

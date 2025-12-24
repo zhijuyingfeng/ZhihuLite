@@ -14,7 +14,7 @@ import org.nigao.zhihuLite.common_ui.LoadMoreResult
 import org.nigao.zhihuLite.common_ui.RefreshResult
 import org.nigao.zhihuLite.data.FeedRepository
 import org.nigao.zhihuLite.eventReporter.sharedEventReporter
-import org.nigao.zhihuLite.model.FeedItem
+import org.nigao.zhihuLite.feedItem.FeedItem
 
 class FeedViewModel(
     private val feedRepository: FeedRepository,

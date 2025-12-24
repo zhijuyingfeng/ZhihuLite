@@ -1,6 +1,7 @@
 package org.nigao.zhihuLite.answerFeed.ui
 
-import org.nigao.zhihuLite.model.FeedItem
+import io.github.aakira.napier.Napier
+import org.nigao.zhihuLite.feedItem.FeedItem
 
 data class ActionBarUiState(
     val voteUpCount: Int,
@@ -15,22 +16,26 @@ data class AnswerCardUiState(
     val authorName: String,
     val content: String,
     val updatedTimestamp: Long = 0,
-    val answerId: String?,
+    val answerId: String,
 )
 
-fun FeedItem.toAnswerCardState(): AnswerCardUiState {
-    val updatedTimestamp = target?.updatedTime ?: 0
+fun FeedItem.toAnswerCardState(): AnswerCardUiState? {
+    if (target == null) {
+        Napier.i("Item filtered. Reason: target == null")
+        return null
+    }
+    val updatedTimestamp = target.updatedTime
     return AnswerCardUiState(
         actionBarUiState = ActionBarUiState(
-            voteUpCount = target?.voteupCount ?: 0,
-            commentCount = target?.commentCount ?: 0,
+            voteUpCount = target.voteupCount,
+            commentCount = target.commentCount,
             updatedTimestamp = updatedTimestamp,
-            answerId = target?.id
+            answerId = target.id
         ),
-        avatarUrl = target?.author?.avatarUrl.toString(),
-        authorName = target?.author?.name.toString(),
-        content = target?.content.toString(),
+        avatarUrl = target.author.avatarUrl.toString(),
+        authorName = target.author.name.toString(),
+        content = target.content.toString(),
         updatedTimestamp = updatedTimestamp,
-        answerId = target?.id
+        answerId = target.id
     )
 }

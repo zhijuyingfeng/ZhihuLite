@@ -18,14 +18,15 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import coil3.compose.AsyncImage
 import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import org.nigao.zhihuLite.R
+import org.nigao.zhihuLite.basicTypeExtension.TimestampFormatter
 import org.nigao.zhihuLite.h5Parser.CoilImageLoader
 import org.nigao.zhihuLite.h5Parser.HtmlToComposeUi
-import org.nigao.zhihuLite.model.FeedItem
 import kotlin.time.ExperimentalTime
 
 @Composable
@@ -33,6 +34,10 @@ fun AnswerCard(
     uiState: AnswerCardUiState,
     modifier: Modifier = Modifier
 ) {
+    val viewModel: AnswerCardViewModel = viewModel(
+        factory = AnswerCardViewModelFactory(uiState.answerId)
+    )
+
     Column(
         modifier = modifier
     ) {
@@ -53,12 +58,19 @@ fun AnswerCard(
                 modifier = Modifier.padding(start = 4.dp),
             )
         }
-        HtmlToComposeUi(uiState.content, uiState.answerId, imageLoader = CoilImageLoader())
+        HtmlToComposeUi(
+            html = uiState.content,
+            answerId = uiState.answerId,
+            imageLoader = CoilImageLoader
+        )
         if (uiState.updatedTimestamp > 0) {
             Text(
                 text = stringResource(
                     R.string.edit_time,
-                    formatTimestamp(uiState.updatedTimestamp)
+                    TimestampFormatter.formatTimestamp(
+                        timestamp = uiState.updatedTimestamp,
+                        format = "YYYY-MM-DD HH:mm"
+                    )
                 ),
                 style = MaterialTheme.typography.labelMedium,
                 color = Color.Gray,
@@ -72,23 +84,3 @@ fun AnswerCard(
         )
     }
 }
-
-@OptIn(ExperimentalTime::class)
-fun formatTimestamp(timestamp: Long): String {
-    val instant = Instant.fromEpochSeconds(timestamp)
-    val beijingTimeZone = TimeZone.of("Asia/Shanghai")
-    val dateTime = instant.toLocalDateTime(beijingTimeZone)
-    return buildString {
-        append(dateTime.year)
-        append('-')
-        append(dateTime.monthNumber.padToTwoDigits())
-        append('-')
-        append(dateTime.dayOfMonth.padToTwoDigits())
-        append(' ')
-        append(dateTime.hour.padToTwoDigits())
-        append(':')
-        append(dateTime.minute.padToTwoDigits())
-    }
-}
-
-private fun Int.padToTwoDigits() = toString().padStart(2, '0')

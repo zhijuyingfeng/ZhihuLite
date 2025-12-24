@@ -1,7 +1,6 @@
 package org.nigao.zhihuLite.video.ui
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -27,7 +26,6 @@ import coil3.compose.AsyncImage
 import kotlinx.coroutines.launch
 import org.nigao.zhihuLite.basicTypeExtension.noRippleClickable
 import org.nigao.zhihuLite.h5Parser.HtmlNode
-import org.nigao.zhihuLite.model.FeedItem
 
 @Composable
 fun VideoElement(

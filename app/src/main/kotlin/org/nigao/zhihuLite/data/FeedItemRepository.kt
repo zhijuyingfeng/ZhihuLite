@@ -1,7 +1,7 @@
 package org.nigao.zhihuLite.data
 
 import io.ktor.util.collections.ConcurrentMap
-import org.nigao.zhihuLite.model.FeedItem
+import org.nigao.zhihuLite.feedItem.FeedItem
 
 object FeedItemRepository {
     private val feedItemsMap: ConcurrentMap<String, FeedItem> = ConcurrentMap()
