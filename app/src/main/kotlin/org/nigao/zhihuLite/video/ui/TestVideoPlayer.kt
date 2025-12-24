@@ -4,9 +4,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import org.nigao.zhihuLite.h5Parser.HtmlToComposeUi
-import org.nigao.zhihuLite.model.FeedItem
-import org.nigao.zhihuLite.model.Target
-import org.nigao.zhihuLite.model.User
+import org.nigao.zhihuLite.feedItem.FeedItem
+import org.nigao.zhihuLite.feedItem.Target
+import org.nigao.zhihuLite.feedItem.User
 
 @Composable
 fun TestVideoPlayer() {

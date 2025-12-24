@@ -10,4 +10,6 @@
     <string name="list_footer_failed">网络错误，请重试</string>
     <string name="list_footer_no_more">暂无更多数据</string>
     <string name="action_bar_share">分享</string>
+    <string name="comment_sort_type_score">默认</string>
+    <string name="comment_sort_type_timestamp">最新</string>
 </resources>

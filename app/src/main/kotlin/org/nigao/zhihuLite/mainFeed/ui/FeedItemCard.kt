@@ -24,6 +24,7 @@ import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import org.nigao.zhihuLite.R
+import org.nigao.zhihuLite.basicTypeExtension.TimestampFormatter
 import org.nigao.zhihuLite.common_ui.ImageGallery
 import org.nigao.zhihuLite.mainFeed.ui.ClickPosition.ImageThumb
 
@@ -88,7 +89,10 @@ fun FeedItemCard(
                 append(stringResource(R.string.comment_count, uiState.commentCount))
                 if (uiState.updatedTime > 0) {
                     append(" ‧ ")
-                    append(formatTimestamp(uiState.updatedTime))
+                    append(TimestampFormatter.formatTimestamp(
+                        timestamp = uiState.updatedTime,
+                        format = "YYYY-MM-DD"
+                    ))
                 }
             },
             style = MaterialTheme.typography.labelMedium,
@@ -102,18 +106,3 @@ fun FeedItemCard(
         )
     }
 }
-
-private fun formatTimestamp(timestamp: Long): String {
-    val instant = Instant.fromEpochSeconds(timestamp)
-    val beijingTimeZone = TimeZone.of("Asia/Shanghai")
-    val dateTime = instant.toLocalDateTime(beijingTimeZone)
-    return buildString {
-        append(dateTime.year)
-        append('-')
-        append(dateTime.monthNumber.padToTwoDigits())
-        append('-')
-        append(dateTime.dayOfMonth.padToTwoDigits())
-    }
-}
-
-private fun Int.padToTwoDigits() = toString().padStart(2, '0')

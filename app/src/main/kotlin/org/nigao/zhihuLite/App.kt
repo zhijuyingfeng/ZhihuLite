@@ -14,7 +14,7 @@ import androidx.navigation.compose.rememberNavController
 import com.nigao.gaia.GaiaEvent
 import com.nigao.gaia.GaiaEventManager
 import org.nigao.zhihuLite.login.LogInManager
-import org.nigao.zhihuLite.model.Question
+import org.nigao.zhihuLite.feedItem.Question
 import org.nigao.zhihuLite.registerRoute.RouteRegisterManager
 import org.nigao.zhihuLite.registerRoute.Routes
 

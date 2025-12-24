@@ -9,7 +9,7 @@ import io.ktor.client.request.headers
 import io.ktor.http.ContentType
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.json.Json
-import org.nigao.zhihuLite.model.FeedResponse
+import org.nigao.zhihuLite.feedItem.FeedResponse
 import org.nigao.zhihuLite.login.LogInManager
 import org.nigao.zhihuLite.web.WebUtil
 

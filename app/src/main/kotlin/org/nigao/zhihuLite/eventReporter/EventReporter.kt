@@ -10,7 +10,7 @@ import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpHeaders
 import org.nigao.zhihuLite.login.LogInManager
-import org.nigao.zhihuLite.model.FeedItem
+import org.nigao.zhihuLite.feedItem.FeedItem
 import org.nigao.zhihuLite.network.sharedHttpClient
 
 class EventReporter(

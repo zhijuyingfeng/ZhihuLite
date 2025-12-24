@@ -6,8 +6,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
 import org.nigao.zhihuLite.common_ui.LoadMoreResult
 import org.nigao.zhihuLite.common_ui.RefreshResult
-import org.nigao.zhihuLite.model.FeedItem
-import org.nigao.zhihuLite.model.FeedResponse
+import org.nigao.zhihuLite.feedItem.FeedItem
+import org.nigao.zhihuLite.feedItem.FeedResponse
 import org.nigao.zhihuLite.network.FeedApi
 
 class FeedRepository(

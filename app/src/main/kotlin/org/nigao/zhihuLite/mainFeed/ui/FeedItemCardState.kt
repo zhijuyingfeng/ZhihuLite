@@ -1,6 +1,6 @@
 package org.nigao.zhihuLite.mainFeed.ui
 
-import org.nigao.zhihuLite.model.FeedItem
+import org.nigao.zhihuLite.feedItem.FeedItem
 
 data class FeedItemCardState(
     val question: String,

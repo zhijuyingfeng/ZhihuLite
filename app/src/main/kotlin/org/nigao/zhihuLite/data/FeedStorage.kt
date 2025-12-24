@@ -3,7 +3,7 @@ package org.nigao.zhihuLite.data
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import org.nigao.zhihuLite.model.FeedItem
+import org.nigao.zhihuLite.feedItem.FeedItem
 
 interface FeedStorage {
     suspend fun appendFeedItems(feedItems: List<FeedItem>)
