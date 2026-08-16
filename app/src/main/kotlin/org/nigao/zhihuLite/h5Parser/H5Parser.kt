@@ -17,6 +17,9 @@ import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -33,6 +36,8 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.collections.immutable.ImmutableMap
 import kotlinx.collections.immutable.toImmutableMap
 import org.nigao.zhihuLite.BuildConfig
@@ -108,9 +113,39 @@ fun HtmlToComposeUi(
     ),
     imageLoader: ImageLoader? = null
 ) {
-    val document = parseSimpleHtml(html)
+    // Parse once per unique HTML string, off the main thread. The result is remembered
+    // for the lifetime of this composition; changing `html` restarts the producer.
+    val document by produceState<List<HtmlNode>?>(initialValue = null, html) {
+        value = withContext(Dispatchers.Default) { parseSimpleHtml(html) }
+    }
+
+    document?.let { nodes ->
+        HtmlNodesToComposeUi(
+            nodes = nodes,
+            modifier = modifier,
+            answerId = answerId,
+            textStyle = textStyle,
+            linkStyle = linkStyle,
+            imageLoader = imageLoader
+        )
+    }
+}
+
+/**
+ * Renders an already-parsed HTML tree. Kept separate from [HtmlToComposeUi] so nested
+ * elements (e.g. unknown tags) can be rendered without re-serializing and re-parsing.
+ */
+@Composable
+private fun HtmlNodesToComposeUi(
+    nodes: List<HtmlNode>,
+    modifier: Modifier = Modifier,
+    answerId: String?,
+    textStyle: TextStyle,
+    linkStyle: SpanStyle,
+    imageLoader: ImageLoader?
+) {
     Column(modifier) {
-        document.forEachIndexed { index, node ->
+        nodes.forEachIndexed { index, node ->
             when (node) {
                 is HtmlNode.TextNode -> {
                     if (node.content.isNotBlank()) {
@@ -156,7 +191,7 @@ private fun HeadingElement(
     element: HtmlNode.Element,
     style: TextStyle = MaterialTheme.typography.headlineLarge
 ) {
-    val content = collectTextContent(element)
+    val content = remember(element) { collectTextContent(element) }
     Text(
         text = content,
         style = style,
@@ -171,8 +206,10 @@ private fun ParagraphElement(
     baseStyle: TextStyle,
     linkStyle: SpanStyle
 ) {
-    val annotatedText = buildAnnotatedString {
-        collectStyledText(element, baseStyle, linkStyle, this)
+    val annotatedText = remember(element, baseStyle, linkStyle) {
+        buildAnnotatedString {
+            collectStyledText(element, baseStyle, linkStyle, this)
+        }
     }
     Text(
         text = annotatedText,
@@ -187,13 +224,15 @@ private fun LinkElement(
     baseStyle: TextStyle,
     linkStyle: SpanStyle
 ) {
-    val annotatedText = buildAnnotatedString {
-        val href = element.attributes["href"] ?: ""
-        pushStringAnnotation(tag = "URL", annotation = href)
-        withStyle(style = linkStyle) {
-            append(collectTextContent(element))
+    val annotatedText = remember(element, baseStyle, linkStyle) {
+        buildAnnotatedString {
+            val href = element.attributes["href"] ?: ""
+            pushStringAnnotation(tag = "URL", annotation = href)
+            withStyle(style = linkStyle) {
+                append(collectTextContent(element))
+            }
+            pop()
         }
-        pop()
     }
 
     val density = LocalDensity.current
@@ -346,8 +385,8 @@ private fun UnknownElement(
         element.children.forEach { child ->
             when (child) {
                 is HtmlNode.TextNode -> Text(text = child.content, style = baseStyle)
-                is HtmlNode.Element -> HtmlToComposeUi(
-                    html = child.toHtml(),
+                is HtmlNode.Element -> HtmlNodesToComposeUi(
+                    nodes = listOf(child),
                     answerId = answerId,
                     textStyle = baseStyle,
                     linkStyle = linkStyle,
