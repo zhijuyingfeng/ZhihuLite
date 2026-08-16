@@ -6,6 +6,13 @@ plugins {
     alias(libs.plugins.serialization)
     id("com.google.devtools.ksp")
 }
+
+// Release signing, driven by CI environment variables (see .github/workflows/release.yml).
+// Local builds stay unsigned when no keystore is provided.
+val releaseKeystore = System.getenv("RELEASE_KEYSTORE_PATH")
+    ?.let { file(it) }
+    ?.takeIf { it.isFile }
+
 android {
     namespace = "org.nigao.zhihuLite"
     compileSdk = libs.versions.android.compileSdk.get().toInt()
@@ -14,8 +21,8 @@ android {
         applicationId = "org.nigao.zhihuLite"
         minSdk = libs.versions.android.minSdk.get().toInt()
         targetSdk = libs.versions.android.targetSdk.get().toInt()
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = (project.findProperty("versionCode") as? String)?.toIntOrNull() ?: 1
+        versionName = (project.findProperty("versionName") as? String) ?: "1.0"
     }
 
     kotlinOptions {
@@ -33,9 +40,22 @@ android {
         }
     }
 
+    signingConfigs {
+        if (releaseKeystore != null) {
+            create("release") {
+                storeFile = releaseKeystore
+                storePassword = System.getenv("RELEASE_KEYSTORE_PASSWORD").orEmpty()
+                keyAlias = System.getenv("RELEASE_KEY_ALIAS").orEmpty()
+                keyPassword = System.getenv("RELEASE_KEY_PASSWORD").orEmpty()
+            }
+        }
+    }
     buildTypes {
         getByName("release") {
             isMinifyEnabled = false
+            if (releaseKeystore != null) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
     }
     compileOptions {
