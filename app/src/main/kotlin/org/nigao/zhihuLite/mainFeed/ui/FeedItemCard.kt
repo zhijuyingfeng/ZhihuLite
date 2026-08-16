@@ -20,9 +20,6 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
-import kotlinx.datetime.Instant
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.toLocalDateTime
 import org.nigao.zhihuLite.R
 import org.nigao.zhihuLite.basicTypeExtension.TimestampFormatter
 import org.nigao.zhihuLite.common_ui.ImageGallery

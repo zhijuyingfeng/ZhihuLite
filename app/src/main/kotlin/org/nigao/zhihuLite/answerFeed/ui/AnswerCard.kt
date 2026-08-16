@@ -20,14 +20,10 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil3.compose.AsyncImage
-import kotlinx.datetime.Instant
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.toLocalDateTime
 import org.nigao.zhihuLite.R
 import org.nigao.zhihuLite.basicTypeExtension.TimestampFormatter
 import org.nigao.zhihuLite.h5Parser.CoilImageLoader
 import org.nigao.zhihuLite.h5Parser.HtmlToComposeUi
-import kotlin.time.ExperimentalTime
 
 @Composable
 fun AnswerCard(

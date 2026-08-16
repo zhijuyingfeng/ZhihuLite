@@ -6,4 +6,5 @@ dependencies {
     implementation(libs.napier.log)
     implementation(libs.symbol.processing.api)
     implementation(libs.kotlinpoet)
+    testImplementation(libs.kotlin.testJunit)
 }

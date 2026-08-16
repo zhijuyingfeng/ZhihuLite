@@ -5,7 +5,7 @@ import androidx.lifecycle.ViewModelProvider
 import org.nigao.zhihuLite.data.FeedRepository
 import org.nigao.zhihuLite.data.MemoryFeedStorage
 import org.nigao.zhihuLite.feedItem.FeedItem
-import org.nigao.zhihuLite.network.sharedWebviewFeedApi
+import org.nigao.zhihuLite.network.sharedKtorFeedApi
 
 class AnswerFeedViewModelFactory(
     val baseUrl: String,
@@ -19,7 +19,7 @@ class AnswerFeedViewModelFactory(
         }
         val feedRepository = FeedRepository(
             initialUrl = baseUrl,
-            feedApi = sharedWebviewFeedApi,
+            feedApi = sharedKtorFeedApi,
             feedStorage = MemoryFeedStorage(),
             initialItems = initialItems
         )

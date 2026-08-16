@@ -2,7 +2,7 @@ package org.nigao.zhihuLite.comment
 
 import io.github.aakira.napier.Napier
 import org.nigao.zhihuLite.network.sharedJson
-import org.nigao.zhihuLite.web.WebUtil
+import org.nigao.zhihuLite.network.ZhihuApi
 
 enum class CommentSortType {
     SCORE, TIMESTAMP,
@@ -27,7 +27,7 @@ class CommentApi(
             currentResponse!!.paging.next.removePrefix(HOST)
         }
         try {
-            val response = WebUtil.request(path = path)
+            val response = ZhihuApi.request(path = path)
             if (response?.isNotBlank() == true) {
                 val commentResponse = sharedJson.decodeFromString<CommentResponse>(response)
                 currentResponse = commentResponse

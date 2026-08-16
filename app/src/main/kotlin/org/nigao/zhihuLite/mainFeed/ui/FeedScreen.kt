@@ -2,7 +2,6 @@ package org.nigao.zhihuLite.mainFeed.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -37,7 +36,6 @@ import org.nigao.zhihuLite.basicTypeExtension.noRippleClickable
 import org.nigao.zhihuLite.common_ui.FeedList
 import org.nigao.zhihuLite.common_ui.FeedListConfig
 import org.nigao.zhihuLite.common_ui.LoadMoreConfig
-import org.nigao.zhihuLite.common_ui.LoadMoreResult
 import org.nigao.zhihuLite.common_ui.RefreshConfig
 import org.nigao.zhihuLite.registerRoute.RouteRegisterManager
 import org.nigao.zhihuLite.registerRoute.RouteRegistry
