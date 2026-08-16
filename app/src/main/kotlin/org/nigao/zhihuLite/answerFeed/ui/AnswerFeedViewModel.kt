@@ -42,7 +42,6 @@ class AnswerFeedViewModel(
     fun reportCardShow(index: Int) {
         viewModelScope.launch {
             val feedItem = getFeedItem(index)
-            println(feedItem)
             feedItem?.let {
                 sharedEventReporter.reportShow(it)
                 sharedEventReporter.reportRead(it)

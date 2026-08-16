@@ -52,7 +52,12 @@ android {
     }
     buildTypes {
         getByName("release") {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
             if (releaseKeystore != null) {
                 signingConfig = signingConfigs.getByName("release")
             }
@@ -75,9 +80,7 @@ android {
 dependencies {
     implementation(libs.compose.ui)
     implementation(libs.compose.foundation)
-    implementation(libs.compose.material3)
     implementation(libs.compose.ui.tooling.preview)
-    implementation(libs.androidx.junit.ktx)
     debugImplementation(libs.compose.ui.tooling)
     implementation(libs.compose.runtime)
     implementation(libs.compose.navigation)
@@ -85,23 +88,33 @@ dependencies {
 
     implementation(libs.androidx.activity.compose)
     implementation(libs.ktor.client.okhttp)
-    implementation(libs.kotlin.testJunit)
     implementation(libs.androidx.lifecycle.viewmodel)
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.lifecycle.runtimeCompose)
+    // Keep the KMP lifecycle wrappers pulled in by Coil 3 aligned with androidx lifecycle.
+    implementation(libs.jetbrains.lifecycle.viewmodel)
+    implementation(libs.jetbrains.lifecycle.runtimeCompose)
     implementation(libs.ktor.client.core)
     implementation(libs.ktor.client.content.negotiation)
     implementation(libs.ktor.serialization.kotlinx.json)
     implementation(libs.coil.compose)
     implementation(libs.coil.network.ktor)
     implementation(libs.kotlinx.collections.immutable)
-    implementation(libs.navigation.compose)
     implementation(libs.napier.log)
     implementation(libs.multiplatform.settings)
     implementation(libs.multiplatform.settings.no.arg)
-    implementation(libs.datetime)
     implementation(libs.androidx.material3)
+
+    testImplementation(libs.kotlin.testJunit)
+    androidTestImplementation(libs.androidx.junit.ktx)
+
     implementation(project(":app:gaia"))
     ksp(project(":app:gaia"))
+
+    constraints {
+        // Pin the transitive concurrent-futures pulled in via profileinstaller to a stable version.
+        implementation(libs.androidx.concurrent.futures)
+    }
 }
 
 android.sourceSets.all {

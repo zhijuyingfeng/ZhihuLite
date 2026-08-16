@@ -18,6 +18,6 @@ object LogInManager {
     }
 
     fun cookie(): String {
-        return Settings().get<String>(COOKIE_KEY).toString()
+        return Settings().get<String>(COOKIE_KEY) ?: ""
     }
 }

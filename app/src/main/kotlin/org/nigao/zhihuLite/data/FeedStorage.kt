@@ -41,7 +41,7 @@ class MemoryFeedStorage(): FeedStorage {
             .filter {
                 val shouldFilter = it.target != null && it.target.type == "article"
                 if (shouldFilter) {
-                    Napier.i("Feed item filtered, reason: it's article, item: ${it.id}, ${it.target.excerpt}")
+                    Napier.i("Feed item filtered, reason: it's article, item: ${it.id}")
                 }
                 !shouldFilter
             }
@@ -49,7 +49,7 @@ class MemoryFeedStorage(): FeedStorage {
                 val answerId = it.target?.id
                 val shouldFilter = answerIdSet.contains(answerId)
                 if (shouldFilter) {
-                    Napier.i("Feed item filtered, reason: it's duplicated, item: ${it.id}, ${it.target?.excerpt}")
+                    Napier.i("Feed item filtered, reason: it's duplicated, item: ${it.id}, answerId: ${it.target?.id}")
                 }
                 !shouldFilter
             }
@@ -57,7 +57,7 @@ class MemoryFeedStorage(): FeedStorage {
 
     private fun logItems(increasedItems: List<FeedItem>) {
         increasedItems.forEach {
-            Napier.i("Increasing item, id: ${it.id}, answerId: ${it.target?.id}, ${it.target?.excerpt}")
+            Napier.i("Increasing item, id: ${it.id}, answerId: ${it.target?.id}")
         }
     }
 
