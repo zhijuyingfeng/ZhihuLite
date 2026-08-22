@@ -1,4 +1,8 @@
 
+import com.android.build.api.instrumentation.FramesComputationMode
+import com.android.build.api.instrumentation.InstrumentationScope
+import org.nigao.zhihulite.buildlogic.BusinessTraceClassVisitorFactory
+
 plugins {
     alias(libs.plugins.androidApplication)
     alias(libs.plugins.kotlinAndroid)
@@ -62,6 +66,16 @@ android {
                 signingConfig = signingConfigs.getByName("release")
             }
         }
+        create("perfetto") {
+            initWith(getByName("release"))
+            applicationIdSuffix = ".perfetto"
+            versionNameSuffix = "-perfetto"
+            isDebuggable = false
+            isMinifyEnabled = false
+            isShrinkResources = false
+            signingConfig = signingConfigs.getByName("debug")
+            matchingFallbacks += listOf("release")
+        }
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
@@ -119,4 +133,30 @@ dependencies {
 
 android.sourceSets.all {
     java.srcDirs("build/generated/$name/kotlin")
+}
+
+// Adds android.os.Trace slices around every concrete method in the app package. The sections are
+// compiled only into the dedicated perfetto build and appear in Perfetto as "BM:...".
+// Disable temporarily with: ./gradlew :app:assemblePerfetto -PbusinessTraceEnabled=false
+val businessTraceEnabled = providers.gradleProperty("businessTraceEnabled")
+    .map { it.toBoolean() }
+    .orElse(true)
+
+androidComponents {
+    onVariants(selector().withBuildType("perfetto")) { variant ->
+        if (!businessTraceEnabled.get()) {
+            return@onVariants
+        }
+
+        variant.instrumentation.transformClassesWith(
+            BusinessTraceClassVisitorFactory::class.java,
+            InstrumentationScope.PROJECT
+        ) { parameters ->
+            parameters.includedClassPrefix.set("org.nigao.zhihuLite")
+            parameters.maxSectionNameLength.set(127)
+        }
+        variant.instrumentation.setAsmFramesComputationMode(
+            FramesComputationMode.COMPUTE_FRAMES_FOR_INSTRUMENTED_METHODS
+        )
+    }
 }
