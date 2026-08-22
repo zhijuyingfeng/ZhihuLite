@@ -12,6 +12,7 @@ sealed class CommentViewUiState {
 }
 
 data class CommentUiState(
+    val id: String,
     val authorAvatarUrl: String,
     val authorName: String,
     val createdTimestamp: Long,
@@ -38,6 +39,7 @@ fun CommentResponse.commentUiStates(): List<CommentUiState> {
 
 fun Comment.toUiState(): CommentUiState {
     return CommentUiState(
+        id = id,
         authorAvatarUrl = author.avatarUrl,
         authorName = author.name,
         createdTimestamp = createdTime,

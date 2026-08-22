@@ -13,6 +13,7 @@ import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.HttpMethod
 import io.ktor.serialization.kotlinx.json.json
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.Json
 import org.nigao.zhihuLite.feedItem.FeedResponse
 import org.nigao.zhihuLite.web.Zse96
@@ -53,6 +54,8 @@ object ZhihuApi {
                 }
             }
             response.bodyAsText()
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Napier.e("ZhihuApi.request($path) failed", e)
             null
@@ -106,8 +109,10 @@ class KtorFeedApi : FeedApi {
             val path = url.removePrefix("https://www.zhihu.com")
             val result = ZhihuApi.request(path) ?: return null
             sharedJson.decodeFromString<FeedResponse>(result)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
-            e.printStackTrace()
+            Napier.e("Failed to decode feed response for $url", e)
             null
         }
     }

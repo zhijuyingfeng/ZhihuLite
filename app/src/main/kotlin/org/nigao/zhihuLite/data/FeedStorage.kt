@@ -27,24 +27,20 @@ class MemoryFeedStorage(): FeedStorage {
     }
 
     override suspend fun refreshFeedItems(feedItems: List<FeedItem>) {
-        val filteredItems = filterFeedItems(feedItems)
-        storedItems.value = filteredItems
-        logItems(filteredItems)
+        // A refresh replaces the existing page, so it must not deduplicate against the IDs from
+        // the old page. Doing so would remove every item that is returned by both requests.
+        val filteredItems = filterUnsupportedFeedItems(feedItems)
+            .distinctBy { it.target?.id ?: it.id }
         answerIdSet.clear()
         answerIdSet.addAll(filteredItems.mapNotNull {
             it.target?.id
         })
+        storedItems.value = filteredItems
+        logItems(filteredItems)
     }
 
     private fun filterFeedItems(feedItems: List<FeedItem>): List<FeedItem> {
-        return feedItems
-            .filter {
-                val shouldFilter = it.target != null && it.target.type == "article"
-                if (shouldFilter) {
-                    Napier.i("Feed item filtered, reason: it's article, item: ${it.id}")
-                }
-                !shouldFilter
-            }
+        return filterUnsupportedFeedItems(feedItems)
             .filter {
                 val answerId = it.target?.id
                 val shouldFilter = answerIdSet.contains(answerId)
@@ -53,6 +49,16 @@ class MemoryFeedStorage(): FeedStorage {
                 }
                 !shouldFilter
             }
+    }
+
+    private fun filterUnsupportedFeedItems(feedItems: List<FeedItem>): List<FeedItem> {
+        return feedItems.filter {
+            val shouldFilter = it.target != null && it.target.type == "article"
+            if (shouldFilter) {
+                Napier.i("Feed item filtered, reason: it's article, item: ${it.id}")
+            }
+            !shouldFilter
+        }
     }
 
     private fun logItems(increasedItems: List<FeedItem>) {

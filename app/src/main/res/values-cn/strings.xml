@@ -12,4 +12,7 @@
     <string name="action_bar_share">分享</string>
     <string name="comment_sort_type_score">默认</string>
     <string name="comment_sort_type_timestamp">最新</string>
+    <string name="video_play">播放视频</string>
+    <string name="video_retry">点击重试</string>
+    <string name="video_unavailable">视频不可用</string>
 </resources>

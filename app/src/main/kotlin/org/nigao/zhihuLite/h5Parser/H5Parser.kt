@@ -17,9 +17,11 @@ import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.produceState
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -113,10 +115,11 @@ fun HtmlToComposeUi(
     ),
     imageLoader: ImageLoader? = null
 ) {
-    // Parse once per unique HTML string, off the main thread. The result is remembered
-    // for the lifetime of this composition; changing `html` restarts the producer.
-    val document by produceState<List<HtmlNode>?>(initialValue = null, html) {
-        value = withContext(Dispatchers.Default) { parseSimpleHtml(html) }
+    // Parse off the main thread. A changed `html` value cancels the previous parse and
+    // starts a new one while retaining the last rendered document until parsing finishes.
+    var document by remember { mutableStateOf<List<HtmlNode>?>(null) }
+    LaunchedEffect(html) {
+        document = withContext(Dispatchers.Default) { parseSimpleHtml(html) }
     }
 
     document?.let { nodes ->

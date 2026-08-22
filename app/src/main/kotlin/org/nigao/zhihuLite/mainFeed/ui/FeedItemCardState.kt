@@ -3,6 +3,7 @@ package org.nigao.zhihuLite.mainFeed.ui
 import org.nigao.zhihuLite.feedItem.FeedItem
 
 data class FeedItemCardState(
+    val id: String,
     val question: String,
     val authorAvatarUrl: String,
     val authorName: String,
@@ -15,6 +16,7 @@ data class FeedItemCardState(
 
 fun FeedItem.toFeedCardState(): FeedItemCardState {
     return FeedItemCardState(
+        id = target?.id ?: id.orEmpty(),
         question = target?.question?.title.toString(),
         authorAvatarUrl = target?.author?.avatarUrl.toString(),
         authorName = target?.author?.name.toString(),

@@ -24,6 +24,7 @@ fun ImageGallery(
     ) {
         items(
             count = imageUrls.size,
+            key = { index -> "${imageUrls[index]}#$index" },
         ) { index ->
             val imageUrl = imageUrls[index]
             AsyncImage(

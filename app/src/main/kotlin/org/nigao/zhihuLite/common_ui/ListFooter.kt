@@ -10,16 +10,13 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import kotlinx.coroutines.launch
 import org.nigao.zhihuLite.R
 import org.nigao.zhihuLite.basicTypeExtension.noRippleClickable
 
@@ -39,27 +36,17 @@ fun ListFooterStatus.text(): String? {
 
 @Composable
 fun ListFooter(
-    loadMore: suspend () -> Unit,
+    loadMore: () -> Unit,
     status: ListFooterStatus = ListFooterStatus.IDLE,
 ) {
-    val coroutineScope = rememberCoroutineScope()
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center,
         modifier = Modifier.fillMaxWidth().height(40.dp)
-            .onGloballyPositioned {
-                if (it.isAttached && status == ListFooterStatus.IDLE) {
-                    coroutineScope.launch {
-                        loadMore.invoke()
-                    }
-                }
-            }
             .noRippleClickable(
                 enabled = status == ListFooterStatus.NETWORK_FAILED
             ) {
-                coroutineScope.launch {
-                    loadMore.invoke()
-                }
+                loadMore()
             }
     ) {
         when(status) {

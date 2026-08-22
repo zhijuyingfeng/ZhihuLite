@@ -11,8 +11,6 @@ import androidx.navigation.Navigator
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import com.nigao.gaia.GaiaEvent
-import com.nigao.gaia.GaiaEventManager
 import org.nigao.zhihuLite.login.LogInManager
 import org.nigao.zhihuLite.feedItem.Question
 import org.nigao.zhihuLite.registerRoute.RouteRegisterManager
@@ -28,7 +26,6 @@ fun App(
     modifier: Modifier = Modifier,
     navController: NavHostController = rememberNavController()
 ) {
-    GaiaEventManager.start(GaiaEvent(key = "register_route"))
     MaterialTheme {
         Scaffold(
             modifier = Modifier.fillMaxSize()

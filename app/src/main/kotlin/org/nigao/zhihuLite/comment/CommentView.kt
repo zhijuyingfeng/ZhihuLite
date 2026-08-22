@@ -22,6 +22,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Modifier
 import androidx.compose.runtime.getValue
@@ -29,6 +30,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -39,6 +41,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil3.compose.AsyncImage
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.launch
 import org.nigao.zhihuLite.R
 import org.nigao.zhihuLite.basicTypeExtension.TimestampFormatter
@@ -183,13 +187,60 @@ fun CommentListView(
     modifier: Modifier = Modifier,
 ) {
     val listState = rememberLazyListState()
-    var footerStatus by remember { mutableStateOf(ListFooterStatus.IDLE) }
+    val coroutineScope = rememberCoroutineScope()
+    var footerStatus by remember {
+        mutableStateOf(
+            if (uiState.hasMore) ListFooterStatus.IDLE else ListFooterStatus.NO_MORE_DATA
+        )
+    }
+
+    fun loadMore() {
+        if (footerStatus == ListFooterStatus.LOADING ||
+            footerStatus == ListFooterStatus.NO_MORE_DATA
+        ) {
+            return
+        }
+
+        footerStatus = ListFooterStatus.LOADING
+        coroutineScope.launch {
+            val result = viewModel.loadComments()
+            footerStatus = when (result) {
+                LoadMoreResult.SUCCESS -> ListFooterStatus.IDLE
+                LoadMoreResult.FAILED -> ListFooterStatus.NETWORK_FAILED
+                LoadMoreResult.NO_MORE_DATA -> ListFooterStatus.NO_MORE_DATA
+            }
+        }
+    }
+
+    LaunchedEffect(uiState.hasMore) {
+        if (!uiState.hasMore) {
+            footerStatus = ListFooterStatus.NO_MORE_DATA
+        }
+    }
+
+    LaunchedEffect(listState) {
+        snapshotFlow {
+            val layoutInfo = listState.layoutInfo
+            val footerIndex = layoutInfo.totalItemsCount - 1
+            footerIndex >= 0 &&
+                layoutInfo.visibleItemsInfo.lastOrNull()?.index == footerIndex
+        }
+            .distinctUntilChanged()
+            .filter { it }
+            .collect {
+                loadMore()
+            }
+    }
+
     LazyColumn(
         state = listState,
         modifier = modifier
     ) {
         items(
             count = uiState.comments.size,
+            key = { index ->
+                uiState.comments[index].id.ifBlank { "comment-item-$index" }
+            },
         ) { index ->
             val commentUiState = uiState.comments[index]
             Row(
@@ -242,17 +293,9 @@ fun CommentListView(
                 }
             }
         }
-        item {
+        item(key = "comment-list-footer") {
             ListFooter(
-                loadMore = {
-                    footerStatus = ListFooterStatus.LOADING
-                    val result = viewModel.loadComments()
-                    footerStatus = when (result) {
-                        LoadMoreResult.SUCCESS -> ListFooterStatus.IDLE
-                        LoadMoreResult.FAILED -> ListFooterStatus.NETWORK_FAILED
-                        LoadMoreResult.NO_MORE_DATA -> ListFooterStatus.NO_MORE_DATA
-                    }
-                },
+                loadMore = ::loadMore,
                 status = footerStatus,
             )
         }

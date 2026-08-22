@@ -102,6 +102,9 @@ fun AnswerFeedScreen(
         ) {
             items(
                 count = uiState.cardStates.size,
+                key = { index ->
+                    uiState.cardStates[index].answerId.ifBlank { "answer-item-$index" }
+                },
             ) { index ->
                 AnswerCard(
                     uiState = uiState.cardStates[index],

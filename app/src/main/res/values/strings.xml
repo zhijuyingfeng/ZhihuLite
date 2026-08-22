@@ -12,4 +12,7 @@
     <string name="action_bar_share">Share</string>
     <string name="comment_sort_type_score">Default</string>
     <string name="comment_sort_type_timestamp">Latest</string>
+    <string name="video_play">Play video</string>
+    <string name="video_retry">Tap to retry</string>
+    <string name="video_unavailable">Video unavailable</string>
 </resources>

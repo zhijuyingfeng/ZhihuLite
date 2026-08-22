@@ -132,6 +132,9 @@ fun SuccessFeedScreen(
     ) {
         items(
             count = uiState.cardStates.size,
+            key = { index ->
+                uiState.cardStates[index].id.ifBlank { "feed-item-$index" }
+            },
         ) { index ->
             val cardState = uiState.cardStates[index]
             val navigateRoute:(ClickPosition) -> Unit = { position ->
