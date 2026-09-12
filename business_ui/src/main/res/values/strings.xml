@@ -17,4 +17,7 @@
     <string name="feed_load_failed">Failed to load. Please try again.</string>
     <string name="retry">Retry</string>
     <string name="logout">Log out</string>
+    <string name="image_viewer_empty">No images to show</string>
+    <string name="video_play">Play video</string>
+    <string name="video_double_speed">倍速播放中</string>
 </resources>

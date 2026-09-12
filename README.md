@@ -1,72 +1,167 @@
 # ZhihuLite
 
-ZhihuLite 是一个使用 Kotlin 和 Jetpack Compose 编写的轻量 Android 客户端项目，主要用于
-展示信息流、回答详情、评论、图片和视频内容，并通过 WebView 完成登录。
+ZhihuLite 是一个用 Kotlin 与 Jetpack Compose 编写的轻量知乎客户端：浏览推荐信息流、问题与回答、
+评论、图片与视频，并通过 WebView 完成登录。
 
-> 本项目并非知乎官方客户端，主要用于 Android、Compose、网络请求、代码生成和性能分析等
-> 技术实践。服务端接口、页面结构和登录流程可能随上游服务变化。
+项目按职责**分层并拆成 8 个 Gradle 模块**，分层规则由模块边界在编译期强制执行，而不是靠约定——
+详见[架构与分层](#架构与分层)。
+
+> 本项目并非知乎官方客户端，仅用于 Android、Compose、网络请求、本地缓存、字节码插桩与性能分析等
+> 技术实践。上游接口、页面结构与登录流程都可能随知乎服务变化而失效。
 
 ## 功能概览
 
-- WebView 登录及 Cookie 状态保存
-- 首页推荐信息流
-- 问题与回答列表
-- 评论列表
-- 图片预览
-- 视频内容展示
+- WebView 登录，Cookie 状态保存
+- 首页推荐信息流：下拉刷新、游标分页、失败重试
+- 问题与回答列表；从信息流带答案进入时，该回答置顶显示
+- 评论列表，支持按分数 / 时间切换排序
+- 回答正文 HTML 渲染：段落、图片、视频、链接、引用、代码块等
+- 图片查看器：点信息流里的图片封面进入，左右翻页
+- 全屏视频播放器：视频封面带播放图标，点它进入播放器（是视频还是图片按正文里有没有视频判断）；
+  横版竖版都按自身比例全宽展示、竖直居中；可拖动进度条（带暗色描边，亮画面下也看得清），
+  单击画面暂停 / 恢复，长按画面 2 倍速播放并在顶部提示
 - 系统分享
-- 下拉刷新和分页加载
-- 基于 KSP 的路由自动注册
-- 基于 ASM 的业务方法 Perfetto 自动插桩
+- Room 本地缓存：冷启动清空上一进程数据并整屏加载，不展示上次内容
+- 仅 `perfetto` 构建：基于 ASM 的业务方法 Trace 自动插桩
 
 ## 技术栈
 
 | 类型 | 技术 |
 |---|---|
+| 语言 / 构建 | Kotlin 2.1.21、Gradle 8.9、AGP 8.7.3、JDK 17 |
 | UI | Jetpack Compose、Material 3 |
-| 导航 | Navigation Compose |
-| 状态管理 | AndroidX ViewModel、Kotlin Flow |
-| 网络 | Ktor Client、OkHttp、Kotlinx Serialization |
+| 导航 | Navigation Compose，`@Serializable` 类型安全路由 |
+| 状态 | AndroidX ViewModel、Kotlin Flow |
+| 网络 | Ktor Client 3、OkHttp、kotlinx.serialization |
+| 本地存储 | Room 2.7、multiplatform-settings |
 | 图片 | Coil 3 |
-| 本地配置 | Multiplatform Settings |
 | 日志 | Napier |
-| 代码生成 | KSP、KotlinPoet |
+| 代码生成 | KSP（仅用于 Room 编译器） |
 | 性能分析 | Perfetto、`android.os.Trace`、ASM 字节码插桩 |
+| 测试 | JUnit4、Robolectric、kotlinx-coroutines-test |
+
+## 架构与分层
+
+### 模块划分
+
+| 模块 | 类型 | 职责 | 直接依赖 |
+|---|---|---|---|
+| `:model` | kotlin-jvm | 接口 DTO 与分页模型（纯数据，无 Android） | — |
+| `:base_logic` | kotlin-jvm | 与业务无关的纯逻辑（数字、时间格式化） | — |
+| `:base_navigation` | kotlin-jvm | 路由词汇表（`@Serializable` 路由定义） | — |
+| `:base_ui` | android-library | 与业务无关的 Compose 基础件（图片加载、修饰符、颜色 / 字符串扩展） | — |
+| `:business_logic` | android-library | 业务逻辑与数据层：Ktor 接口、Room 缓存、解析、上报 | `:model` |
+| `:business_ui` | android-library | 各功能的 Compose 界面与 ViewModel | `:business_logic`、`:base_ui`、`:base_logic`、`:base_navigation` |
+| `:performance` | android-library | 插桩注解 `@NoBusinessTrace` 与运行时桥接 | — |
+| `:assemble` | android-application | 应用装配：`MainActivity`、`NavHost`、`AppContainer`；**单元测试都在这里** | `:business_ui`、`:business_logic`、`:performance` |
+
+依赖方向只能向下：
+
+```text
+:assemble ──▶ :business_ui ──▶ :business_logic ──▶ :model
+     │              │
+     │              ├──▶ :base_ui
+     │              ├──▶ :base_logic
+     │              └──▶ :base_navigation
+     └──▶ :performance
+```
+
+### 为什么用 Gradle 模块而不是包约定
+
+因为**只有依赖方向上的隔离才是可验证的隔离**：
+
+- 在 `:business_logic` 里 `import org.nigao.zhihuLite.business_ui.*` 会直接编译失败
+  （`Unresolved reference`）——那一层不在它的编译类路径上，不需要靠 code review 或 grep 去发现。
+- `:model`、`:base_logic`、`:base_navigation` 是纯 `kotlin-jvm` 模块，连 `import android.*`
+  都编译不过，所以"逻辑层偷偷依赖 Android 框架"这类问题在类型系统层面就不存在。
+- 跨模块无法智能转换 / 无法访问 `internal`，这类约束会以编译错误的形式暴露出来。
+
+代价写在 `docs/REFACTOR_PLAN.md` 里：拆分后每个模块各自拥有 `R` 类
+（`android.nonTransitiveRClass=true`），perfetto 插桩的作用域必须从"隐式全部"改成显式配置，
+而单元测试只能放在 `:assemble`（跨模块接缝需要完整的应用类路径）。
+
+### 装配方式
+
+功能模块不直接拿依赖，而是声明自己需要什么：
+
+- 每个功能声明一个 `*Wiring` 接口（如 `FeedWiring`、`AnswerWiring`），说明"装配这个功能需要提供
+  哪些对象"。
+- `:assemble` 的 `AppContainer` 实现这些接口，并通过 `Application` 持有。
+- ViewModel 用 `CreationExtras.requireWiring<FeedWiring>()` 取到它，因此 `:business_ui` 不需要
+  知道 `:assemble` 的存在。
+
+一个信息流请求的路径：
+
+```text
+FeedScreen / FeedViewModel  (:business_ui)
+        │  FeedOperations / FeedRepository
+        ▼
+Room + Ktor                 (:business_logic)
+        │  DTO
+        ▼
+FeedItem / Target ...       (:model)
+```
+
+### 导航与页面切换
+
+导航图写在 `:assemble` 的 `AssembleAppNavHost` 里（类型安全的 `@Serializable` 路由来自
+`:base_navigation`），不用事件总线也不用代码生成。页面切换是 push / pop 的横向滑动（300 ms）：
+
+- 进入下层页面：新页面从右侧推入，当前页面向左让位；返回时反向滑回。
+- 全屏播放器与图片查看器同样如此，因此它们的画面是**随页面一起移走**的，而不是原地淡出。
+- 不使用系统"预测性返回"的页面预览（manifest 里 `enableOnBackInvokedCallback=false`）：
+  边缘滑动返回时不会实时预览目标页面，松手后才执行。
+- 这四个方向（push 进 / push 出 / pop 进 / pop 出）是**同一个决定的两半**：只做一侧会在动画
+  期间露出底色。原因与取舍写在 `docs/REFACTOR_PLAN.md` 的 §7.25。
 
 ## 项目结构
 
 ```text
 ZhihuLite/
-├── app/
-│   ├── src/main/                    # Android 应用代码和资源
-│   ├── src/perfetto/                # Perfetto 构建专用 Manifest
-│   └── gaia/                        # 基于 KSP 的路由注册代码生成器
-├── buildSrc/                        # ASM 业务方法 Trace 插桩
+├── model/                    # 纯数据 DTO 与分页模型（kotlin-jvm）
+├── base_logic/               # 与业务无关的纯逻辑（kotlin-jvm）
+├── base_navigation/          # 路由定义（kotlin-jvm）
+├── base_ui/                  # 与业务无关的 Compose 基础件
+├── business_logic/           # 业务逻辑 + 数据层（Room、Ktor）
+│   └── schemas/              # Room schema 导出
+├── business_ui/              # 各功能的界面与 ViewModel
+├── performance/              # @NoBusinessTrace 与 Trace 运行时桥接
+├── assemble/                 # 应用装配与全部单元测试
+│   ├── src/main/             # MainActivity、NavHost、AppContainer
+│   ├── src/perfetto/         # perfetto 变体专用 Manifest
+│   └── src/test/             # 148 个单元用例
+├── buildSrc/                 # ASM 业务方法 Trace 插桩
 ├── perfetto/
-│   └── business-methods.pbtxt       # Perfetto 采集配置
+│   └── business-methods.pbtxt
 ├── scripts/
-│   └── capture-perfetto.sh          # 无需 Android Studio 的采集脚本
+│   └── capture-perfetto.sh
 ├── docs/
+│   ├── REFACTOR_PLAN.md
 │   └── perfetto-business-method-tracing.md
-└── captures/                        # 本地 Trace 输出目录，不提交到 Git
+└── captures/                 # 本地 Trace 输出，不提交
 ```
+
+## 数据层与缓存
+
+- 信息流按"查询"缓存：`feed_query` 记录查询本身与分页游标，`feed_item` 以 `(query_id, id)`
+  为主键存放条目，载荷是接口原始 JSON，避免字段变化就要迁移表结构。
+- **冷启动会丢弃上一进程的缓存**：`DefaultApplication.onCreate` 触发一次清理，界面整屏加载，
+  因此不会看到上次运行留下的内容。
+- **离开问题页会释放该查询**：`clearQuery(query)` 之后做一次压缩（`VACUUM` +
+  `wal_checkpoint(TRUNCATE)`），否则被删掉的页面仍以 WAL 高水位的形式占着空间。
+- 已知未做：`feed_query` 的行数与存活时间仍无上限，需要 schema v2 与迁移策略。
 
 ## 环境要求
 
 - JDK 17
-- Android SDK Platform 35
-- Android SDK Build Tools 35.0.0
-- Android 设备或模拟器
-- 使用性能采集脚本时，需要：
-  - Bash
-  - `adb` 已加入 `PATH`
-  - Android 9 / API 28 或更高版本设备
-  - 设备已开启 USB 调试并授权当前电脑
+- Android SDK Platform 35、Build Tools 35.0.0
+- Android 设备或模拟器（`minSdk` 26）
 
 应用配置：
 
 | 配置 | 值 |
 |---|---:|
+| `applicationId` | `org.nigao.zhihuLite` |
 | `minSdk` | 26 |
 | `targetSdk` | 35 |
 | `compileSdk` | 35 |
@@ -89,10 +184,10 @@ sdk.dir=/path/to/Android/sdk
 ./gradlew :assemble:assembleDebug
 ```
 
-APK 默认输出到：
+APK 输出到：
 
 ```text
-app/build/outputs/apk/debug/
+assemble/build/outputs/apk/debug/assemble-debug.apk
 ```
 
 直接安装到已连接设备：
@@ -101,38 +196,17 @@ app/build/outputs/apk/debug/
 ./gradlew :assemble:installDebug
 ```
 
-### Perfetto APK
-
-`perfetto` 是专门用于性能采集的构建类型：
-
-- 包名为 `org.nigao.zhihuLite.perfetto`，不会覆盖普通安装包。
-- 使用 Debug 签名，便于本地安装。
-- 关闭代码压缩和资源压缩，保留可读的方法名。
-- 开启 `<profileable android:shell="true">`。
-- 默认对项目业务方法执行 ASM Trace 插桩。
-
-构建：
-
-```bash
-./gradlew :assemble:assemblePerfetto
-```
-
-安装：
-
-```bash
-./gradlew :assemble:installPerfetto
-```
-
-如果临时不需要业务方法自动插桩：
-
-```bash
-./gradlew :assemble:assemblePerfetto -PbusinessTraceEnabled=false
-```
-
 ### Release APK 和 AAB
 
 ```bash
 ./gradlew :assemble:assembleRelease :assemble:bundleRelease
+```
+
+产物：
+
+```text
+assemble/build/outputs/apk/release/assemble-release-unsigned.apk
+assemble/build/outputs/bundle/release/
 ```
 
 版本号可以通过 Gradle 属性传入：
@@ -152,17 +226,49 @@ export RELEASE_KEY_ALIAS=your_key_alias
 export RELEASE_KEY_PASSWORD=your_key_password
 ```
 
+### Perfetto APK
+
+`perfetto` 是专门用于性能采集的构建类型：
+
+- 包名为 `org.nigao.zhihuLite.perfetto`，不会覆盖普通安装包。
+- 使用 Debug 签名，便于本地安装。
+- 关闭代码压缩和资源压缩，保留可读的方法名。
+- 开启 `<profileable android:shell="true">`。
+- 对本项目所有模块的业务方法执行 ASM Trace 插桩。
+
+构建与安装：
+
+```bash
+./gradlew :assemble:assemblePerfetto
+./gradlew :assemble:installPerfetto
+```
+
+产物位于：
+
+```text
+assemble/build/outputs/apk/perfetto/assemble-perfetto.apk
+```
+
+如果临时不需要业务方法自动插桩：
+
+```bash
+./gradlew :assemble:assemblePerfetto -PbusinessTraceEnabled=false
+```
+
 ### 运行测试
 
 ```bash
 ./gradlew test
 ```
 
-只运行 App 模块单元测试：
+只运行单元测试任务（全部用例都在应用模块）：
 
 ```bash
 ./gradlew :assemble:testDebugUnitTest
 ```
+
+测试都是 JVM 单元测试：Room 相关用例通过 Robolectric 跑真实 SQLite，网络与播放器等外部依赖用
+假实现替换，因此不需要设备。
 
 ## Perfetto 性能 Trace
 
@@ -260,12 +366,13 @@ captures/zhihulite-YYYYMMDD-HHMMSS.perfetto-trace
 4. 展开主线程、RenderThread 和其他相关线程。
 5. 搜索 `BM:` 查看业务方法切片。
 
-业务切片示例：
+业务切片示例（取自真实采集）：
 
 ```text
-BM:data.FeedRepository#getInitialItems(Continuation)
-BM:login.AuthWebViewKt#AuthWebView$lambda$3$lambda$2(...)
-BM:MainActivity#onCreate(Bundle)
+BM:assemble.container.AppContainer#discardPreviousSessionFeeds()
+BM:assemble.shell.AppKt#App(Modifier,Composer,int,int)
+BM:business_logic.feed.EventReporter#<init>(HttpClient)
+BM:base_navigation.FullScreenVideoRoute#<clinit>()
 ```
 
 切片宽度表示该次同步方法调用的耗时。嵌套调用会显示为嵌套切片，可以结合以下系统
@@ -294,15 +401,14 @@ binder transaction
 
 ### 业务方法插桩
 
-只有 `perfetto` 构建会为 `org.nigao.zhihuLite` 包下的具体方法添加：
+只有 `perfetto` 构建会为方法添加 Trace 切片，`debug` 与 `release` 都不会。插桩在编译期通过
+`buildSrc` 中的 ASM Visitor 完成，不进入业务代码，也不需要手写埋点。
 
-```kotlin
-android.os.Trace.beginSection(...)
-android.os.Trace.endSection()
-```
-
-插桩在编译期通过 `buildSrc` 中的 ASM Visitor 完成，不需要在每个方法中手动添加代码，
-并且不会进入 Debug 和 Release 构建。
+插桩范围是**本项目全部 8 个模块**（类名前缀 `org.nigao.zhihuLite`），第三方依赖不处理。
+这一点是实测的：反汇编 `assemble-perfetto.apk` 的 dex 后，共 480 个类包含插桩调用，分属全部
+8 个模块——`:model`（136）、`:business_ui`（182）、`:business_logic`（116）、`:assemble`（21）、
+`:base_navigation`（12）、`:base_ui`（7）、`:base_logic`（4）、`:performance`（2）。
+`:model`、`:base_logic` 这类纯 JVM 模块虽然在事件流里出现得少，但确实被插桩了。
 
 如果某个高频或耗时极短的方法没有分析价值，可以排除它：
 
@@ -315,7 +421,6 @@ fun trivialGetter(): String = value
 
 ### Trace 注意事项
 
-- 自动插桩只处理当前 App 模块生成的类，不处理第三方依赖。
 - 同步 Trace Slice 表示同一线程内的同步执行区间。
 - `suspend` 方法发生挂起或线程切换时，不代表完整的端到端耗时；必要时应补充异步
   Trace。
@@ -328,3 +433,10 @@ fun trivialGetter(): String = value
 
 - [Perfetto 业务方法耗时说明](docs/perfetto-business-method-tracing.md)
 - [Perfetto Web Viewer](https://perfetto.dev/#viewer)
+
+## 文档
+
+- [`docs/REFACTOR_PLAN.md`](docs/REFACTOR_PLAN.md)：分层重构方案、每一轮的修订记录，以及每个已修
+  缺陷的根因分析。项目当前的架构约定与已知取舍以它为准。
+- [`docs/perfetto-business-method-tracing.md`](docs/perfetto-business-method-tracing.md)：
+  perfetto 变体的插桩与采集细节。

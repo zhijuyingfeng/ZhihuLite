@@ -1,6 +1,8 @@
 package org.nigao.zhihuLite.business_ui.feed
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -8,7 +10,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.PlayCircleFilled
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -73,11 +78,36 @@ fun FeedItemCard(
             modifier = Modifier.padding(top = 4.dp),
         )
         uiState.imageThumbnails?.takeIf { it.isNotEmpty() }?.let {
-            ImageGallery(
-                imageUrls = it,
-                modifier = Modifier.height(160.dp).padding(top = 4.dp, bottom = 4.dp),
-                onClick = { index -> onClick(ImageThumb(index)) }
-            )
+            // The gallery sizes this Box: a `matchParentSize` child contributes nothing to its
+            // parent's measurement, so wrapping the gallery in one collapsed the cover to zero
+            // width (invisible covers, badge squeezed to the left edge). The scrim below matches
+            // whatever the gallery measured.
+            Box {
+                ImageGallery(
+                    imageUrls = it,
+                    modifier = Modifier.height(160.dp).padding(top = 4.dp, bottom = 4.dp),
+                    onClick = { index -> onClick(ImageThumb(index)) }
+                )
+                if (uiState.videoId != null) {
+                    // A video's cover is a poster and is indistinguishable from a photo, so this is
+                    // the only thing telling the reader that the cover opens a player rather than
+                    // the image viewer. Same visual language as the plate in an answer body.
+                    // It does not consume touches: the whole card stays tappable, and the cover
+                    // itself opens the player.
+                    Box(
+                        modifier = Modifier
+                            .matchParentSize()
+                            .background(Color.Black.copy(alpha = 0.3f)),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.PlayCircleFilled,
+                            contentDescription = stringResource(R.string.video_play),
+                            tint = Color.White,
+                            modifier = Modifier.align(Alignment.Center).size(44.dp),
+                        )
+                    }
+                }
+            }
         }
         Text(
             text = buildString {

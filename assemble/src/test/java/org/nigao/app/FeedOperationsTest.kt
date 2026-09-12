@@ -40,6 +40,11 @@ class FakeFeedRepository(initiallyLoaded: Boolean = false) : FeedRepository {
 
     override fun observe(): Flow<List<FeedItem>> = items.map { it }
 
+    /** Publishes items to observers, so a test can drive a ViewModel's item list. */
+    fun emit(newItems: List<FeedItem>) {
+        items.value = newItems
+    }
+
     override suspend fun hasLoadedOnce(): Boolean = loaded
 
     override suspend fun loadFirstPage(): LoadMoreOutcome {

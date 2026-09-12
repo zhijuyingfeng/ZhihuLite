@@ -6,6 +6,7 @@ import kotlinx.coroutines.CoroutineScope
 import org.nigao.zhihuLite.business_logic.feed.data.AnswerApi
 import org.nigao.zhihuLite.business_logic.feed.data.FeedStorage
 import org.nigao.zhihuLite.business_logic.feed.FeedOperations
+import org.nigao.zhihuLite.business_logic.video.data.VideoPlayInfoApi
 import org.nigao.zhihuLite.business_logic.zhihu.FeedApi
 
 /**
@@ -36,6 +37,7 @@ interface AnswerWiring {
     val storage: FeedStorage
     val feedApi: FeedApi
     val answerApi: AnswerApi
+    val videoApi: VideoPlayInfoApi
 
     /**
      * A scope that outlives a screen, for work that has to survive the ViewModel.

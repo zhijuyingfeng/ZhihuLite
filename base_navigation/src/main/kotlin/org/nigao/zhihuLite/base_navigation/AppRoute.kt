@@ -32,6 +32,18 @@ data object MainFeedRoute : AppRoute
  * question can be opened from elsewhere entirely); the previous version passed `"0"` as a
  * placeholder, which the destination had to special-case.
  */
+/**
+ * Full-screen video playback.
+ *
+ * Both ids are required: the play-info request needs the answer as `content_id`, and a video plate
+ * only offers playback when it has both (a video inside a comment has no answer id).
+ */
+@Serializable
+data class FullScreenVideoRoute(
+    val answerId: String,
+    val videoId: String,
+) : AppRoute
+
 @Serializable
 data class QuestionDetailRoute(
     val questionId: String,

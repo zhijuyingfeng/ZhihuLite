@@ -1,8 +1,13 @@
 # Perfetto 业务方法耗时（无需 Android Studio）
 
-专用的 `perfetto` 构建会在编译期自动为 `org.nigao.zhihuLite` 包下的具体方法添加
-`android.os.Trace.beginSection/endSection` 调用，不需要在每个方法里手写埋点。
-`debug` 和 `release` 构建均不进行业务方法插桩。
+专用的 `perfetto` 构建会在编译期自动为类名前缀是 `org.nigao.zhihuLite` 的方法添加 Trace
+调用（经运行时桥接 `BusinessMethodTrace` 落到 `android.os.Trace.beginSection/endSection`），
+不需要在每个方法里手写埋点。`debug` 和 `release` 构建均不进行业务方法插桩。
+
+覆盖范围是**本项目的全部 8 个 Gradle 模块**（不只是应用模块）：
+反汇编 `assemble-perfetto.apk` 的 dex 实测 480 个类被插桩——`:business_ui` 182、`:model` 136、
+`:business_logic` 116、`:assemble` 21、`:base_navigation` 12、`:base_ui` 7、`:base_logic` 4、
+`:performance` 2。第三方依赖不在范围内。
 
 ## 一键构建、安装和采集
 
@@ -96,7 +101,10 @@ adb shell rm -f "$DEVICE_TRACE"
 切片名称格式：
 
 ```text
-BM:data.FeedRepository#loadFeed(long,Continuation)
+BM:assemble.container.AppContainer#discardPreviousSessionFeeds()
+BM:assemble.shell.AppKt#App(Modifier,Composer,int,int)
+BM:business_logic.feed.EventReporter#<init>(HttpClient)
+BM:base_navigation.FullScreenVideoRoute#<clinit>()
 ```
 
 切片宽度就是该次同步方法调用的耗时；嵌套方法会显示为嵌套切片。方法异常退出时，
@@ -109,7 +117,7 @@ BM:data.FeedRepository#loadFeed(long,Continuation)
 
 自动插桩默认：
 
-- 只处理当前 App 模块编译生成的类，不处理三方依赖。
+- 处理本项目所有模块编译出的类（`InstrumentationScope.ALL` + 前缀 `org.nigao.zhihuLite`），不处理三方依赖。
 - 排除 `R`、`BuildConfig`、`Manifest`。
 - 排除 abstract、native、synthetic、bridge 方法。
 - 只在 `perfetto` 变体启用，`debug` 和 `release` 没有这部分运行时开销。

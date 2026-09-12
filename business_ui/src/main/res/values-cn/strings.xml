@@ -17,4 +17,5 @@
     <string name="feed_load_failed">加载失败，请重试。</string>
     <string name="retry">重试</string>
     <string name="logout">退出登录</string>
+    <string name="image_viewer_empty">没有可显示的图片</string>
 </resources>

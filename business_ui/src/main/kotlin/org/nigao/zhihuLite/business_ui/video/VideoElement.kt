@@ -8,245 +8,65 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.PlayCircleFilled
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.boundsInWindow
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
 import coil3.compose.AsyncImage
 import org.nigao.zhihuLite.base_ui.noRippleClickable
 import org.nigao.zhihuLite.business_logic.answer.HtmlNode
 
-private const val MIN_VISIBLE_PLAYBACK_FRACTION = 0.5f
+/**
+ * How a video plate asks for full-screen playback.
+ *
+ * A CompositionLocal rather than another renderer parameter: `onLinkClick` is threaded through every
+ * recursive element function because any text can produce a link, while only a `video-box` produces a
+ * video — threading a callback through ten signatures for one call site would be noise. The screen
+ * that can navigate provides it; a renderer used without a provider (a preview, a test) simply draws
+ * a plate that does nothing.
+ */
+val LocalVideoPlaybackRequest = staticCompositionLocalOf<((answerId: String, videoId: String) -> Unit)?> { null }
 
+/**
+ * The plate that stands in for a video inside an answer body: the film's poster plus a play control.
+ *
+ * Playback itself happens on the full-screen player, so this is an entry point and nothing more. It
+ * used to host an inline `VideoView` driven by a process-wide coordinator; that machinery (source
+ * preference order, first-frame reveal, lifecycle pausing, release on dispose) now lives in
+ * [VideoSurface], where the reader actually watches the video.
+ */
 @Composable
 fun VideoElement(
     answerId: String?,
     element: HtmlNode.Element,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val videoId = element.attributes["data-lens-id"]?.takeIf(String::isNotBlank)
-    val videoKey = if (answerId.isNullOrBlank() || videoId == null) {
-        null
-    } else {
-        "$answerId:$videoId"
-    }
     val imageNode = element.children.firstOrNull {
         it is HtmlNode.Element && it.tagName.equals("img", ignoreCase = true)
     }
     val coverImageUrl = (imageNode as? HtmlNode.Element)?.attributes?.get("src")
 
-    if (videoKey == null) {
-        VideoUnavailable(
-            coverImageUrl = coverImageUrl,
-            modifier = modifier,
-        )
+    // Without both ids the play-info request cannot be built, so the plate is honest about it
+    // instead of offering a control that would fail (a video inside a comment has no answer id).
+    if (videoId == null || answerId.isNullOrBlank()) {
+        VideoUnavailable(coverImageUrl = coverImageUrl, modifier = modifier)
         return
     }
 
-    val viewModel: VideoElementViewModel = viewModel(
-        key = videoKey,
-        factory = VideoElementViewModelFactory(
-            answerId = answerId,
-            element = element
-        )
-    )
-    val videoPlayInfoState by viewModel.playInfoState.collectAsStateWithLifecycle()
-    val activeVideoKey by VideoPlaybackCoordinator.activeVideoKey.collectAsStateWithLifecycle()
-    val isActive = activeVideoKey == videoKey
-    val hostView = LocalView.current
-
-    var playbackState by remember(videoKey) {
-        mutableStateOf(VideoPlaybackState.Preparing)
-    }
-    var playerAttempt by remember(videoKey) { mutableIntStateOf(0) }
-    var isMostlyVisible by remember(videoKey) { mutableStateOf(true) }
-
-    DisposableEffect(videoKey) {
-        onDispose {
-            VideoPlaybackCoordinator.deactivate(videoKey)
-        }
-    }
-    LaunchedEffect(isActive, isMostlyVisible) {
-        if (isActive && !isMostlyVisible) {
-            VideoPlaybackCoordinator.deactivate(videoKey)
-        }
-    }
-
-    fun startPlayback(forceRefresh: Boolean) {
-        playbackState = VideoPlaybackState.Preparing
-        if (forceRefresh) {
-            playerAttempt++
-        }
-        VideoPlaybackCoordinator.activate(videoKey)
-        viewModel.getPlayInfo(forceRefresh = forceRefresh)
-    }
-
-    val playableUrls = (videoPlayInfoState as? VideoPlayInfoState.Success)
-        ?.videoPlayInfo
-        ?.getPlayableUrls()
-        .orEmpty()
+    val requestPlayback = LocalVideoPlaybackRequest.current
 
     Box(
         modifier = modifier
             .fillMaxWidth()
             .aspectRatio(16f / 9f)
             .background(Color.Black)
-            .onGloballyPositioned { coordinates ->
-                val bounds = coordinates.boundsInWindow()
-                val visibleFraction = bounds.visibleHeightFraction(hostView.height.toFloat())
-                val currentlyMostlyVisible =
-                    visibleFraction >= MIN_VISIBLE_PLAYBACK_FRACTION
-                if (isMostlyVisible != currentlyMostlyVisible) {
-                    isMostlyVisible = currentlyMostlyVisible
-                }
-            }
-    ) {
-        coverImageUrl?.let { url ->
-            AsyncImage(
-                model = url,
-                contentDescription = null,
-                modifier = Modifier.matchParentSize(),
-            )
-        }
-
-        if (isActive &&
-            videoPlayInfoState is VideoPlayInfoState.Success &&
-            playableUrls.isNotEmpty()
-        ) {
-            key(playerAttempt) {
-                VideoPlayer(
-                    urls = playableUrls,
-                    onStateChanged = { playbackState = it },
-                    onPlaybackCompleted = {
-                        VideoPlaybackCoordinator.deactivate(videoKey)
-                    },
-                    modifier = Modifier.matchParentSize(),
-                )
-            }
-        }
-
-        when {
-            !isActive -> {
-                VideoPlayOverlay(
-                    onClick = { startPlayback(forceRefresh = false) },
-                    modifier = Modifier.matchParentSize(),
-                )
-            }
-
-            videoPlayInfoState is VideoPlayInfoState.Failed ||
-                (videoPlayInfoState is VideoPlayInfoState.Success &&
-                    playableUrls.isEmpty()) ||
-                playbackState == VideoPlaybackState.Error -> {
-                VideoErrorOverlay(
-                    onClick = { startPlayback(forceRefresh = true) },
-                    modifier = Modifier.matchParentSize(),
-                )
-            }
-
-            videoPlayInfoState is VideoPlayInfoState.Initialized ||
-                videoPlayInfoState is VideoPlayInfoState.Loading ||
-                playbackState == VideoPlaybackState.Preparing ||
-                playbackState == VideoPlaybackState.Buffering -> {
-                VideoLoadingOverlay(modifier = Modifier.matchParentSize())
-            }
-        }
-    }
-}
-
-private fun Rect.visibleHeightFraction(windowHeight: Float): Float {
-    if (height <= 0f || windowHeight <= 0f) {
-        return 0f
-    }
-    val visibleTop = top.coerceAtLeast(0f)
-    val visibleBottom = bottom.coerceAtMost(windowHeight)
-    return ((visibleBottom - visibleTop).coerceAtLeast(0f) / height).coerceIn(0f, 1f)
-}
-
-@Composable
-private fun VideoPlayOverlay(
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Box(
-        modifier = modifier
-            .noRippleClickable(onClick = onClick)
-            .background(Color.Black.copy(alpha = 0.3f))
-    ) {
-        Icon(
-            imageVector = Icons.Default.PlayCircleFilled,
-            contentDescription = null,
-            modifier = Modifier
-                .align(Alignment.Center)
-                .size(48.dp),
-            tint = Color.White,
-        )
-    }
-}
-
-@Composable
-private fun VideoLoadingOverlay(modifier: Modifier = Modifier) {
-    Box(
-        modifier = modifier.background(Color.Black.copy(alpha = 0.35f))
-    ) {
-        CircularProgressIndicator(
-            modifier = Modifier
-                .align(Alignment.Center)
-                .size(36.dp),
-            color = Color.White,
-        )
-    }
-}
-
-@Composable
-private fun VideoErrorOverlay(
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Box(
-        modifier = modifier
-            .noRippleClickable(onClick = onClick)
-            .background(Color.Black.copy(alpha = 0.55f))
-    ) {
-        // Tapping anywhere on the overlay retries (it goes through startPlayback(forceRefresh =
-        // true)); no new user-visible copy is added for it.
-        Icon(
-            imageVector = Icons.Default.ErrorOutline,
-            contentDescription = null,
-            modifier = Modifier
-                .align(Alignment.Center)
-                .size(36.dp),
-            tint = Color.White,
-        )
-    }
-}
-
-@Composable
-private fun VideoUnavailable(
-    coverImageUrl: String?,
-    modifier: Modifier = Modifier,
-) {
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .aspectRatio(16f / 9f)
-            .background(Color.Black)
+            .noRippleClickable(enabled = requestPlayback != null) {
+                requestPlayback?.invoke(answerId, videoId)
+            },
     ) {
         coverImageUrl?.let { url ->
             AsyncImage(
@@ -258,15 +78,51 @@ private fun VideoUnavailable(
         Box(
             modifier = Modifier
                 .matchParentSize()
-                .background(Color.Black.copy(alpha = 0.55f))
+                .background(Color.Black.copy(alpha = 0.3f)),
+        ) {
+            Icon(
+                imageVector = Icons.Default.PlayCircleFilled,
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .size(48.dp),
+            )
+        }
+    }
+}
+
+/** A video that cannot be played here, with its poster if the HTML carried one. */
+@Composable
+private fun VideoUnavailable(
+    coverImageUrl: String?,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .aspectRatio(16f / 9f)
+            .background(Color.Black),
+    ) {
+        coverImageUrl?.let { url ->
+            AsyncImage(
+                model = url,
+                contentDescription = null,
+                modifier = Modifier.matchParentSize(),
+            )
+        }
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .background(Color.Black.copy(alpha = 0.55f)),
         ) {
             Icon(
                 imageVector = Icons.Default.ErrorOutline,
                 contentDescription = null,
+                tint = Color.White,
                 modifier = Modifier
                     .align(Alignment.Center)
                     .size(36.dp),
-                tint = Color.White,
             )
         }
     }

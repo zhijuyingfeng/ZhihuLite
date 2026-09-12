@@ -13,6 +13,7 @@ import org.nigao.zhihuLite.business_ui.shared.RefreshResult
 import org.nigao.zhihuLite.business_logic.feed.FeedOperations
 import org.nigao.zhihuLite.business_logic.feed.data.LoadMoreOutcome
 import org.nigao.zhihuLite.base_navigation.AppRoute
+import org.nigao.zhihuLite.base_navigation.FullScreenVideoRoute
 import org.nigao.zhihuLite.base_navigation.ImageViewerRoute
 import org.nigao.zhihuLite.base_navigation.QuestionDetailRoute
 import org.nigao.zhihuLite.model.feed.FeedItem
@@ -33,7 +34,16 @@ class FeedViewModel(
     private val _uiState: MutableStateFlow<FeedUiState> = MutableStateFlow(FeedUiState.Loading)
     val uiState: StateFlow<FeedUiState> = _uiState.asStateFlow()
 
-    /** Latest observed items, so clicks do not re-read storage by index. */
+    /** Latest observed cards, so clicks do not re-read storage by index. */
+    private var currentCards: List<FeedItemCardState> = emptyList()
+
+    /**
+     * The items behind [currentCards], same order and same length, for reporting a card as seen.
+     *
+     * Both lists are built in one pass. They used to be built separately — cards from a filtered
+     * list, routing from the raw one — so a feed-level entry shifted every card's destination by
+     * one and taps landed on the neighbouring item (or on nothing).
+     */
     private var currentItems: List<FeedItem> = emptyList()
 
     /**
@@ -59,12 +69,19 @@ class FeedViewModel(
         viewModelScope.launch {
             try {
                 operations.observe().collect { items ->
-                    currentItems = items
+                    // One pass, so the cards the reader sees and the list taps are resolved against
+                    // can never differ in length or order: an item without a target (a feed-level
+                    // entry) is dropped from both at once.
+                    val cards = items.mapNotNull { item ->
+                        item.toFeedCardState()?.let { state -> state to item }
+                    }
+                    currentCards = cards.map { it.first }
+                    currentItems = cards.map { it.second }
                     _uiState.value = when {
                         items.isNotEmpty() -> FeedUiState.Success(
-                            // mapNotNull: an item without a target cannot be rendered (its card
-                            // would be blank) and cannot be opened, so it is dropped here.
-                            cardStates = items.mapNotNull { it.toFeedCardState() },
+                            // mapNotNull above: an item without a target cannot be rendered (its
+                            // card would be blank) and cannot be opened, so it is dropped here.
+                            cardStates = currentCards,
                         )
                         // Keep an error visible until fresh data actually arrives.
                         _uiState.value is FeedUiState.Failed -> _uiState.value
@@ -133,13 +150,25 @@ class FeedViewModel(
      * The typed destination for a tap. Returning a route object (instead of a URL string) means an
      * argument rename or reorder is a compile error.
      *
-     * No suspension needed: the item list is already in memory.
+     * `index` is a **card** index — the same one the list handed back — and the decision is read off
+     * the card state, so the badge on a video cover and the screen it opens can never disagree.
+     *
+     * No suspension needed: the card list is already in memory.
      */
     fun destinationFor(index: Int, position: ClickPosition): AppRoute? {
-        val target = currentItems.getOrNull(index)?.target?.takeIf { it.question != null } ?: return null
+        val card = currentCards.getOrNull(index) ?: return null
         return when (position) {
-            is ClickPosition.ImageThumb -> ImageViewerRoute(answerId = target.id, page = position.page)
-            else -> QuestionDetailRoute(questionId = target.question!!.id, answerId = target.id)
+            is ClickPosition.ImageThumb -> {
+                // A video card's cover is a poster, not a photo: tapping it opens the player.
+                val videoId = card.videoId
+                if (videoId != null) {
+                    FullScreenVideoRoute(answerId = card.answerId, videoId = videoId)
+                } else {
+                    ImageViewerRoute(answerId = card.answerId, page = position.page)
+                }
+            }
+
+            else -> card.questionId?.let { QuestionDetailRoute(questionId = it, answerId = card.answerId) }
         }
     }
 

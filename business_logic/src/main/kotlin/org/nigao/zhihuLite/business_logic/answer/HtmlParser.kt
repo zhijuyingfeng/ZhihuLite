@@ -26,6 +26,9 @@ private val VOID_TAGS = setOf(
  */
 private val RAW_TEXT_TAGS = setOf("script", "style", "title", "textarea", "code")
 
+/** The video page's address, used to recover a video id when the anchor's attributes lack one. */
+private val VIDEO_HREF = Regex("""/video/(\d+)""")
+
 private val NAMED_ENTITIES = mapOf(
     "amp" to "&", "lt" to "<", "gt" to ">", "quot" to "\"", "apos" to "'",
     "nbsp" to "\u00A0", "copy" to "\u00A9", "reg" to "\u00AE", "trade" to "\u2122",
@@ -159,6 +162,36 @@ object HtmlParseCache {
 
     /** Test seam. */
     fun clear() = synchronized(lock) { entries.clear() }
+}
+
+/**
+ * The id of the first `video-box` in [html], or `null` when the body has no video.
+ *
+ * A feed card knows it is a video only by its body: the video id lives in the anchor's
+ * `data-lens-id`, and the play-info endpoint needs it. Parsing is cached ([HtmlParseCache]), so a tap
+ * on the same card does not parse twice.
+ */
+fun firstVideoId(html: String): String? {
+    fun findVideoId(node: HtmlNode): String? {
+        if (node is HtmlNode.Element) {
+            val isVideoBox = node.tagName.equals("a", ignoreCase = true) &&
+                node.attributes["class"].orEmpty().contains("video-box")
+            if (isVideoBox) {
+                // `data-lens-id` is what the captured payloads carry, but their sibling
+                // `data-video-id` ships *empty*, so the attribute set is evidently not dependable;
+                // the href is the video page's own address and holds the same id.
+                node.attributes["data-lens-id"]?.takeIf(String::isNotBlank)?.let { return it }
+                node.attributes["href"]
+                    ?.let(VIDEO_HREF::find)
+                    ?.groupValues
+                    ?.getOrNull(1)
+                    ?.let { return it }
+            }
+            node.children.forEach { child -> findVideoId(child)?.let { return it } }
+        }
+        return null
+    }
+    return parseSimpleHtml(html).firstNotNullOfOrNull(::findVideoId)
 }
 
 fun parseSimpleHtml(html: String): List<HtmlNode> {

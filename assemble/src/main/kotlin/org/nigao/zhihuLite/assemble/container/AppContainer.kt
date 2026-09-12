@@ -19,6 +19,8 @@ import org.nigao.zhihuLite.business_logic.feed.data.RoomFeedStorage
 import org.nigao.zhihuLite.business_logic.feed.data.ZhihuDatabase
 import org.nigao.zhihuLite.business_logic.feed.data.sharedAnswerApi
 import org.nigao.zhihuLite.business_logic.login.data.EncryptedCredentialStore
+import org.nigao.zhihuLite.business_logic.video.data.VideoPlayInfoApi
+import org.nigao.zhihuLite.business_logic.video.data.sharedVideoPlayInfoApi
 import org.nigao.zhihuLite.business_logic.zhihu.FeedApi
 import org.nigao.zhihuLite.business_logic.zhihu.sharedHttpClient
 import org.nigao.zhihuLite.business_logic.zhihu.sharedKtorFeedApi
@@ -53,6 +55,8 @@ class AppContainer(private val application: Application) : FeedWiring, AnswerWir
     override val feedApi: FeedApi get() = sharedKtorFeedApi
 
     override val answerApi: AnswerApi get() = sharedAnswerApi
+
+    override val videoApi: VideoPlayInfoApi get() = sharedVideoPlayInfoApi
 
     /**
      * Storage for one screen's feed.
