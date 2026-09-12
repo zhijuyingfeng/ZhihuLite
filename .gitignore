@@ -1,6 +1,8 @@
 *.iml
 .kotlin
 .gradle
+# Alternative Gradle home used when the default ~/.gradle is not writable (sandbox/CI).
+.gradle-dsh
 **/build/
 xcuserdata
 !src/**/build/

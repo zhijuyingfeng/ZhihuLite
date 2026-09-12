@@ -1,0 +1,124 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 1,
+    "identityHash": "56dc147bc1b7a99feebf925672fecd1f",
+    "entities": [
+      {
+        "tableName": "feed_item",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `query_id` TEXT NOT NULL, `position` INTEGER NOT NULL, `pinned_in_query` INTEGER NOT NULL, `json` TEXT NOT NULL, PRIMARY KEY(`query_id`, `id`), FOREIGN KEY(`query_id`) REFERENCES `feed_query`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "queryId",
+            "columnName": "query_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "position",
+            "columnName": "position",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "pinnedInQuery",
+            "columnName": "pinned_in_query",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "json",
+            "columnName": "json",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "query_id",
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_feed_item_query_id",
+            "unique": false,
+            "columnNames": [
+              "query_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_feed_item_query_id` ON `${TABLE_NAME}` (`query_id`)"
+          },
+          {
+            "name": "index_feed_item_pinned_in_query",
+            "unique": false,
+            "columnNames": [
+              "pinned_in_query"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_feed_item_pinned_in_query` ON `${TABLE_NAME}` (`pinned_in_query`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "feed_query",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "query_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "feed_query",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `initial_url` TEXT NOT NULL, `cursor_next` TEXT, `cursor_is_end` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "initialUrl",
+            "columnName": "initial_url",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "cursorNext",
+            "columnName": "cursor_next",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "cursorIsEnd",
+            "columnName": "cursor_is_end",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        }
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '56dc147bc1b7a99feebf925672fecd1f')"
+    ]
+  }
+}

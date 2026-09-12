@@ -1,17 +1,38 @@
 package org.nigao.zhihuLite
 
 import android.app.Application
-import com.nigao.gaia.registerAll
 import io.github.aakira.napier.DebugAntilog
 import io.github.aakira.napier.Napier
+import org.nigao.zhihuLite.assemble.container.AppContainer
+import org.nigao.zhihuLite.business_ui.ContainerHolder
+import org.nigao.zhihuLite.business_ui.login.SessionStore
 
-class DefaultApplication: Application() {
+/**
+ * Process entry point.
+ *
+ * Owns the [AppContainer] and installs the process-wide side effects (logging, credential store)
+ * before any screen runs. Implements [ContainerHolder] so the container can be resolved from
+ * `CreationExtras` without callers needing to know this class — which is what keeps DI types out of
+ * the screen layers.
+ *
+ * Note that this class holds the container but is **not** itself a `*Wiring`: the wiring interfaces
+ * are implemented by [AppContainer]. Resolution therefore goes through this holder (see
+ * `CreationExtras.requireWiring`).
+ */
+class DefaultApplication : Application(), ContainerHolder<AppContainer> {
+
+    override val container: AppContainer by lazy { AppContainer(this) }
+
     override fun onCreate() {
         super.onCreate()
 
         if (BuildConfig.DEBUG) {
             Napier.base(DebugAntilog())
         }
-        registerAll()
+
+        // The session credential is encrypted with a Keystore-backed key. Wired here (rather than
+        // inside SessionStore) so login logic never has to reach for a Context, and so a test can
+        // substitute an in-memory store without touching Android crypto.
+        SessionStore.credentialStore = container.credentialStore
     }
 }
