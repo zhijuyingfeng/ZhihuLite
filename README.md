@@ -86,7 +86,7 @@ sdk.dir=/path/to/Android/sdk
 ### Debug APK
 
 ```bash
-./gradlew :app:assembleDebug
+./gradlew :assemble:assembleDebug
 ```
 
 APK 默认输出到：
@@ -98,7 +98,7 @@ app/build/outputs/apk/debug/
 直接安装到已连接设备：
 
 ```bash
-./gradlew :app:installDebug
+./gradlew :assemble:installDebug
 ```
 
 ### Perfetto APK
@@ -114,31 +114,31 @@ app/build/outputs/apk/debug/
 构建：
 
 ```bash
-./gradlew :app:assemblePerfetto
+./gradlew :assemble:assemblePerfetto
 ```
 
 安装：
 
 ```bash
-./gradlew :app:installPerfetto
+./gradlew :assemble:installPerfetto
 ```
 
 如果临时不需要业务方法自动插桩：
 
 ```bash
-./gradlew :app:assemblePerfetto -PbusinessTraceEnabled=false
+./gradlew :assemble:assemblePerfetto -PbusinessTraceEnabled=false
 ```
 
 ### Release APK 和 AAB
 
 ```bash
-./gradlew :app:assembleRelease :app:bundleRelease
+./gradlew :assemble:assembleRelease :assemble:bundleRelease
 ```
 
 版本号可以通过 Gradle 属性传入：
 
 ```bash
-./gradlew :app:assembleRelease :app:bundleRelease \
+./gradlew :assemble:assembleRelease :assemble:bundleRelease \
   -PversionName=1.2.3 \
   -PversionCode=102003
 ```
@@ -161,7 +161,7 @@ export RELEASE_KEY_PASSWORD=your_key_password
 只运行 App 模块单元测试：
 
 ```bash
-./gradlew :app:testDebugUnitTest
+./gradlew :assemble:testDebugUnitTest
 ```
 
 ## Perfetto 性能 Trace

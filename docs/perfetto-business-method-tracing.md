@@ -55,7 +55,7 @@
 首次构建和安装：
 
 ```bash
-./gradlew :app:installPerfetto
+./gradlew :assemble:installPerfetto
 ```
 
 不使用脚本时，手动启动并停止采集：
@@ -104,6 +104,9 @@ BM:data.FeedRepository#loadFeed(long,Continuation)
 
 ## 过滤
 
+插桩范围：`InstrumentationScope.ALL` —— 代码已按层拆成多个 Gradle 模块，所以 `assemble` 模块必须
+连依赖（各 library 模块）一起插桩；只插 `PROJECT` 会让除应用模块外的所有层失去 trace。
+
 自动插桩默认：
 
 - 只处理当前 App 模块编译生成的类，不处理三方依赖。
@@ -125,7 +128,7 @@ fun trivialGetter(): String = value
 临时关闭整个自动插桩：
 
 ```bash
-./gradlew :app:assemblePerfetto -PbusinessTraceEnabled=false
+./gradlew :assemble:assemblePerfetto -PbusinessTraceEnabled=false
 ```
 
 采集配置位于：

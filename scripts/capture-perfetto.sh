@@ -175,7 +175,7 @@ if [[ "$install_app" == true ]]; then
     echo "Building and installing the perfetto variant on $serial..."
     if ! (
         cd "$PROJECT_DIR"
-        ANDROID_SERIAL="$serial" ./gradlew :app:installPerfetto
+        ANDROID_SERIAL="$serial" ./gradlew :assemble:installPerfetto
     ); then
         fail "installation failed; approve the device prompt or enable the OEM 'Install via USB' option, then retry"
     fi

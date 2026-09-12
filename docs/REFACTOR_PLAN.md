@@ -248,6 +248,40 @@ org.nigao.zhihuLite
 > - **每个 feature 自带两个文件**:`*Wiring.kt`(声明"我要什么"的接口)+ `*Entry.kt`(工厂 + `registerXxxRoute`)。它们与 Screen 同目录,就近维护。
 > - **`assemble/container/` 只做三件事**:实现所有 `*Wiring` 接口、把容器包成 `CreationExtras`、汇总全局单例。
 > - **`assemble/navigation/AppNavHost.kt` 只汇总**:每行一个 `registerXxxRoute(this, navController)`,不含任何具体 ViewModel 的名字。
+
+### 2.1 落地的物理结构（一个 Gradle 模块 = 一层）
+
+上面那张图是**方案期的包规划**（其中不少条目最终没有落地）。真正跑在仓库里的结构如下，2026-09-13 由 §7.22 引入；**模块边界就是分层规则的执行者**：
+
+```
+ZhihuLite/
+├── model/            (kotlin-jvm + serialization)   层 1  DTO
+├── base_logic/       (kotlin-jvm)                   层 2  纯能力：无 Android、无 Compose、零项目内依赖
+├── base_navigation/  (kotlin-jvm + serialization)   跨层词汇：AppRoute / AppNavigator
+├── base_ui/          (android-library + compose)    层 3  通用 UI 基建
+├── business_logic/   (android-library + ksp + room) 层 4  业务逻辑 + Room + Zhihu 协议
+│   └── schemas/                                     Room 导出的 schema（随模块走）
+├── business_ui/      (android-library + compose)    层 5  Screen / ViewModel / 共享组件
+│   └── src/main/res/                                本模块自己的字符串与 drawable
+├── performance/      (android-library)              支撑模块：插桩桥 + @NoBusinessTrace
+└── assemble/         (android-application)          层 6  容器 + 导航图 + shell + res/manifest
+    ├── src/main/kotlin/.../assemble/{container,navigation,shell}/
+    ├── src/main/res/                                app_name / 图标 / 主题 / network config
+    ├── src/perfetto/                                perfetto 变体的 profileable manifest
+    └── src/test/java/org/nigao/app/                 全部 JVM/Robolectric 单测
+```
+
+依赖方向（`api(project(...))`，编译器强制）：
+
+```
+model ─┬─> base_logic ──> base_ui ─┐
+       │                           ├─> business_ui ─┐
+       └─> business_logic ─────────┘                ├─> assemble
+base_navigation ────────────────────┘                │
+performance ────────────────────────────────────────┘
+```
+
+三处与方案期不同的取舍，都写在 §7.22：`base_logic` 用**纯 JVM 模块**（因此"不碰 Android"也是编译期保证）；`performance` 单列成支撑模块而不是塞进某一层；`assemble` 的 shell 类真正进了 `assemble/shell/` 包（`DefaultApplication` / `MainActivity` / `App`），根包只剩生成的 `R` 与 `BuildConfig`。
 >
 > 于是 `assemble` 里"每 feature 一小块"的表现形式是**容器里一组懒加载属性 + 一个接口实现**,而不是一堆工厂函数（详见 §4.7）。
 
@@ -272,6 +306,8 @@ org.nigao.zhihuLite
 | `business_ui` | 各业务的**表现层**:Screen · ViewModel · UiState · 卡片模型,以及**本 feature 的装配出口**(`*Entry.kt`:工厂+路由)与**依赖声明**(`*Wiring.kt`) | 不得 import `business_logic/*/data`(只认契约);不 import `assemble` |
 | `business_ui/shared` | 跨业务共享的 Compose 组件(ListFooter/CommonPanel/ImageGallery…) | 不放业务规则 |
 | `assemble` | `container/`(全局单例、实现各 `*Wiring`)、`shell/`(进程入口与外壳)、`navigation/`(全局导航汇总) | **禁止业务逻辑,禁止界面组件**;不得承载具体 feature 的工厂或路由实现 |
+
+**强制手段（2026-09-13 落地）：一层的边界就是一个 Gradle 模块。** 上表每一行的"不得 import X"不再靠自觉——`model` / `base_logic` / `base_navigation` / `base_ui` / `business_logic` / `business_ui` / `assemble` 各是一个 Gradle 模块，引用方向就是 `api(project(...))` 的方向；**被禁的那层根本不在编译类路径上**。实测：把 `import org.nigao.zhihuLite.business_ui.FeedWiring` 写进 `business_logic`，编译直接报 `Unresolved reference 'business_ui'`。此外 `model` / `base_logic` / `base_navigation` 是**纯 JVM 模块**（`kotlin-jvm` 而非 Android library），所以在 `base_logic` 里写 `import android.*` 同样无法解析——"逻辑层不碰 Android"也从约定变成了编译器保证。详见 §7.22。
 
 **分工要点(这是本次重构的核心收益)**
 
@@ -1585,12 +1621,13 @@ Phase 1–4 的目标项**全部完成**，以下是尚未完成或有意留到�
 4. ~~`CredentialStore` 尚未加密~~ **已完成**：`EncryptedCredentialStore`（AES-256-GCM + Keystore）。真机加解密往返与明文迁移删除**已在 §7.15 闭环验证**。
 5. **曝光上报只做了去重，没做批量/节流**：同一 `(itemId, kind)` 只报一次，但每张卡片仍是 show + 2×read；由于 Feed 列表本身未做分页触发，实际请求量未观测。
 6. **`*Entry.kt` 未实现**：路由仍集中在 `assemble/navigation/AssembleAppNavHost` 注册，工厂留在各 feature 内。功能等价，但"每个 feature 自带装配出口"（§3.2/§4.7）未落地；`*_WIRING_KEY` 式的显式 `CreationExtras` 也未采用（见 §4.7 差异说明）。
-7. **`tools/typecheck.sh` 与 `tools/run_unit_tests.sh` 已过期**：仍含已删除的 Gaia 桩，缺 Room/Robolectric 依赖。Gradle 已可直接使用，这两个脚本应当修好或删除。
+7. ~~**`tools/typecheck.sh` 与 `tools/run_unit_tests.sh` 已过期**~~ **已删除**（§7.22）：那条"无 Gradle 的手工编译链"是沙箱期的临时方案，Gradle 已可直接使用，而模块拆分让它的路径与 R 生成假设彻底失效——留着只会误导。`tools/verify.sh` 一并删除，验证命令就是 `./gradlew :assemble:testDebugUnitTest`。
 8. **Phase 4 剩余项**（§7.7 已登记）：把 `sharedHttpClient` 注入 Coil（`setSingletonImageLoaderFactory`），避免 Coil 自带一套无鉴权 HTTP 栈；深色模式与 `ColorTokens`；release 日志与 CI 构建冒烟。
 9. **全部交互路径缺少真机回归**：目前真机可自动验证的是"冷启 + 首屏网络请求落库 + 广告过滤 + 冷启丢弃缓存"（§7.15–§7.17）；**需要手指的路径仍未在设备上确认**——点击卡片进入回答详情（§7.16）、上滑分页、评论、视频、图片查看器。原因是设备锁屏/Doze 且 MIUI 拒绝 `adb shell input`（`INJECT_EVENTS`）。
 10. **退出登录没有 UI 入口了**（用户要求移除 Feed 上的按钮）：`LogOutRoute` / `LogoutScreen` / `SessionStore.logout()` / `string.logout` 都保留着，但当前没有任何界面能触发它。会话过期自动回登录页的逻辑不受影响。将来要么放进设置页，要么连路由一起删。
 11. **冷启动必然重新请求第一页**（用户要求，§7.17）：缓存不再跨进程复用，所以每次启动至少 1 次网络请求，离线启动会看到失败页 + 重试而不是上次的内容。这是产品决策而非缺陷，但代价要记在这里。
 12. **`target == null` 的 feed 条目**现在在 `business_ui` 侧被丢弃（§7.17 ④），因此不会渲染空卡片；它们仍会被写入 Room（`FeedMapper` 用 `position:` 合成 id 保证主键唯一），会占用 `DEFAULT_MAX_STORED_ROWS` 的名额。真机上尚未观察到这类条目，所以没有进一步处理。
+13. **`feed_query` 条数无上限、无时间过期**（§7.23）：只有 per-feed 的 300 行上限与冷启动全清。要加需给 `feed_query` 增 `last_access_at`（schema v2 + 真迁移）。
 
 ### 7.15 启动崩溃修复与真机冒烟（含 Room 游标的一处真实缺陷）
 
@@ -1920,6 +1957,119 @@ JSON input: ..."maxbitrate":0,"bitrate":301.201,"duration":405.185,...
 
 **仍待用户确认**：点开一个带视频的回答，看是否真的能播（我只能验到"解码成功 + 解析出 6 条播放地址"）。
 
+### 7.22 把分层固化成模块：违反方向的引用现在编译不过
+
+**用户要求**：把分层信息固化到代码里，违反层级的引用在编译期直接报错。
+
+**做法**：一个 Gradle 模块 = 一层。包结构（Phase 3 的成果）完全不动，所以这次改的是**构建结构**，不是代码搬迁：
+
+| 模块 | 插件 | 说明 | 依赖 |
+|---|---|---|---|
+| `:model` | kotlin-jvm + serialization | DTO，零项目内依赖 | `api(kotlinx-serialization)` |
+| `:base_logic` | **kotlin-jvm** | 纯能力；无 Android/Compose/Ktor | napier |
+| `:base_navigation` | kotlin-jvm + serialization | `AppRoute` / `AppNavigator` | serialization-core |
+| `:base_ui` | android-library + compose | 色彩/Modifier/字符串扩展 + 图片加载 | compose、coil、core-ktx |
+| `:business_logic` | android-library + ksp + room | 业务逻辑 + Room + Zhihu 协议 | `api(:model)`、ktor-core、room、napier、settings |
+| `:business_ui` | android-library + compose | Screen / ViewModel / 共享组件（**自带 res**） | `api(:business_logic/:base_ui/:base_logic/:base_navigation)`、lifecycle、compose |
+| `:performance` | android-library | 插桩桥 + `@NoBusinessTrace`（支撑模块，不属于任何一层） | 无 |
+| `:assemble` | android-application | 容器 + 导航图 + shell + res/manifest + perfetto 变体 + **全部单测** | `implementation(:business_ui/:business_logic/:performance)` |
+
+**"编译期报错"是实测过的，不是承诺**：把 `import org.nigao.zhihuLite.business_ui.FeedWiring` 写进 `business_logic`，`:business_logic:compileDebugKotlin` 立刻失败：
+
+```
+e: .../business_logic/LayeringProbe.kt:3:28 Unresolved reference 'business_ui'.
+e: .../business_logic/LayeringProbe.kt:6:32 Unresolved reference 'FeedWiring'.
+```
+
+**这次改动暴露出的真实违规（已修）**
+
+拆分前先量了依赖矩阵，**发现一处一直存在的越层引用**：`business_logic → business_ui` 三处——
+
+- `ZhihuApi` / `EventReporter` 依赖 `business_ui.login.LogInManager`
+- `EncryptedCredentialStore`（`business_logic`）实现的却是 `business_ui` 里声明的 `CredentialStore` 接口
+
+即"会话与凭证的契约声明得比实现高了一层"。修法是把 `CredentialStore`（→ `business_logic/login/data/`）与 `SessionStore` / `LogInManager`（→ `business_logic/login/`）整体下移，`business_ui/login/` 只留 `AuthWebView` / `LogInScreen`。这是"先用工具量一遍"直接换来的收益——只读代码时没人注意到。
+
+**模块边界顺带解决的 / 顺带暴露的**
+
+1. **`base_logic` 变成纯 JVM 模块** → "逻辑层不碰 Android"从约定变成编译错误（那里 `import android.*` 无法解析）。`model` / `base_navigation` 同理。
+2. **R 类不再共享**（`android.nonTransitiveRClass=true`）：`business_ui` 用自己的 `R`，于是它用到的 18 个字符串与 `avatar_placeholder.png` 搬进 `business_ui/src/main/res/`；`assemble` 只留 `app_name` + 图标/主题/network config。
+3. **跨模块 smart cast 失效**：`target` 由别的模块声明时，`if (target == null) return` 之后不能直接 `target.x`，两处改为先绑局部变量（`AnswerCardUiState` / `FeedItemCardState`）。
+4. **`api` vs `implementation` 被迫想清楚**：`ZhihuApi.client`（Ktor）、Room 的 DAO/实体、`HtmlNode.Element.attributes`（ImmutableMap）都出现在公开签名里 → 改 `api`；引擎、KSP、settings 留在 `implementation`。
+5. **单测留在 `:assemble`**（一个套件、一条命令，且能看见所有层）。代价是跨模块的 `internal` 测试缝必须公开：`FeedOperations.reportedKeyCount/hasReported/coldStartDiscardPerformed`、`KtorAnswerApi.parseAnswer`、`HtmlParseCache`、`SessionStore.resetForTest`、`TimestampFormatter.cachedFormatterCount`、`ListFooterPager` 构造器、`HtmlRenderer.sanitizedLinkTarget`，以及被渲染器共用的 `normalizeTagName`。每处都注释了"这是给应用模块测试套件的公开缝"。
+6. **lint 崩溃（AGP 8.7 + Kotlin 2.1）**：`NonNullableMutableLiveDataDetector` 会让 `lintVitalAnalyzeRelease` 崩（`IncompatibleClassChangeError`）。应用模块原本就 `disable "NullSafeMutableLiveData"`，现在每个 library 模块也要，否则 `:base_ui:lintVitalAnalyzeRelease` 直接失败。
+7. **perfetto 插桩范围必须改**：单模块时 `InstrumentationScope.PROJECT` 恰好等于"全部代码"；拆分后它只剩 `assemble` 自己。改成 **`ALL`** 并实测覆盖到每一层（见下）——这是"拆分会让某个功能静默减配"的典型例子。
+8. **CI 与脚本路径**：`release.yml` 的 `:app:` → `:assemble:`（APK 名也从 `app-release.apk` 变成 `assemble-release-unsigned.apk`）；`scripts/capture-perfetto.sh`、README、perfetto 文档同步。`tools/` 那套"无 Gradle 手工链"（typecheck / run_unit_tests / gen_r_class / verify）**整体删除**——它的路径与 R 生成假设已彻底失效，留着只会误导。
+
+**验证**
+
+| 手段 | 结果 |
+|---|---|
+| 单测 | **127，0 失败**（`./gradlew :assemble:testDebugUnitTest`，Robolectric + 真 Room 全部照旧） |
+| 三个变体 | `:assemble:assembleDebug` / `:assemble:assembleRelease` / `:assemble:assemblePerfetto` 全部 BUILD SUCCESSFUL |
+| **越层引用被拒** | 临时在 `business_logic` 里 `import ...business_ui.FeedWiring` → `Unresolved reference 'business_ui'`，随即删除探针 |
+| **插桩覆盖每一层** | perfetto APK：`BM:` 出现 3007 次，按模块分布 `model 1305 / business_ui 877 / business_logic 668 / assemble 69 / base_navigation 54 / base_logic 22 / base_ui 11 / performance 1`；**debug APK：0 次** |
+| 依赖方向 | 拆分后只剩向下的边：`business_logic → {model}`、`business_ui → {business_logic, base_ui, base_logic, base_navigation, model}`、`assemble → 业务层` |
+
+**仍未验证 / 已知代价**
+
+- 真机行为理论上不变（包名、代码、资源名都没动，只是编译单元变了），但最终确认是 CI 上跑一次 tag 发布；perfetto 里 `model` 贡献的 1305 个切片有大量 `BuildConfig#<init>` / DTO `#<clinit>` 噪声，需要用 `@NoBusinessTrace` 或过滤瘦身。
+- 增量构建变快了（改 `business_ui` 不必重编 `model`/`base_logic`），但每个 Android library 都要跑一遍 lint/资源合并，干净构建的总时间变长。
+
+### 7.23 数据库清理：按 feed 清、清完压缩、冷启清上一进程
+
+**用户要求的三件事**（上一轮我列出的缺口里挑的三条）：给 `FeedStorage` 加 `clearQuery(query)` 并在离开问题页时调用；清库后压缩；冷启时清掉上次进程 Feed 的存储。
+
+**① 按 feed 清理（`clearQuery`）**
+
+| 层 | 新增 |
+|---|---|
+| `FeedDao` | `deleteQueryRow(queryId)` + `@Transaction clearFeed(queryId)`（先删 items 再删 cursor 行；外键本会级联，显式更清楚） |
+| `FeedStorage` | `clearQuery(query)` |
+| `FeedRepository` | `discardStoredFeed()`（只清这个 feed，区别于 `discardStoredData()` 清全部） |
+| `AnswerFeedViewModel` | `onCleared` → `releaseScreenResources()`：离开问题页就丢弃本页缓存 |
+
+两个关键点：
+
+- **cursor 必须跟着行一起删**。只删行会留下 `feed_query` 行，`hasLoadedOnce` 继续回答"已加载"，重进该问题会显示空列表而不是重新抓取。
+- **删除跑在容器的作用域上**（新增 `AnswerWiring.screenTeardownScope`）。`onCleared` 是唯一知道"读者离开"的地方，而那时 `viewModelScope` **已经被取消**——用它启动的删除一个字节都不会执行。这是 §7.19 那条教训的另一种表现形式：清理协程的作用域必须活得比它保护的资源更久。
+- `releaseScreenResources()` 是 public 的测试缝（跨模块无法用 `ViewModelStore` 驱动 protected 的 `onCleared`）。
+
+**② 清库后压缩**
+
+`RoomFeedStorage` 改为持有 `ZhihuDatabase` 而不是只有 DAO，因为 **Room 的 `@Query` 不支持 `VACUUM`**（实测报 `UNKNOWN query type is not supported yet. You can use: SELECT, INSERT, DELETE, UPDATE`），压缩只能走 `openHelper.writableDatabase`。
+
+**这里有一次被测量推翻的假设，值得记下来。** 我原本的写法是"先 checkpoint 再 VACUUM"，并断言文件会变小。实测结果：
+
+| 语句 | `auto_vacuum` | `page_count` | WAL 字节 |
+|---|---|---|---|
+| 空库 | **1（FULL）** | 10 | – |
+| 插入 200 行（每行 ~2KB） | 1 | 212 | ~900 KB |
+| 仅 DELETE（不压缩） | 1 | **10** | 512 KB |
+| VACUUM | 1 | 10 | – |
+
+结论有两条，都写进了代码注释：
+
+1. **Android 的 SQLite 跑在 `auto_vacuum = FULL` 下，文件本身在 DELETE 时就已经回收**（`page_count` 不加 VACUUM 也回到 10）——所谓"删了不缩"在本平台上并不成立。真正会保持高水位的是 **WAL**：去掉 checkpoint 后残留 **512 KB**。
+2. **顺序必须是 VACUUM → checkpoint**：VACUUM 自己会写 WAL，先 checkpoint 会被它的写入重新撑大（实测残留 41 KB，而正确顺序 <4 KB）。
+
+所以"压缩"在本平台的实际内容是 **`VACUUM` + `wal_checkpoint(TRUNCATE)`，且 checkpoint 收尾**；VACUUM 保留为 auto_vacuum 关闭场景（比如从别处拷来的库）的廉价保险。测试也据此改成断言**真实文件字节**，而不是 `page_count`——否则去掉 checkpoint 也能"通过"。
+
+**③ 冷启清库改到进程启动**
+
+原来 `discardStoredFeedOnColdStart()` 只在 **feed 页首次创建**时触发：如果这次进程停在登录页、或永远没进 Feed，上一进程的存储就会活到下一次。现在 `AppContainer.discardPreviousSessionFeeds()`（返回 `Job`，既是启动入口也是测试缝）由 **`DefaultApplication.onCreate`** 调用；`FeedViewModel` 仍然先 await 再订阅，所以"先清 → 再订阅 → 再加载"的顺序（§7.17 的防闪屏保证）没变。`coldStartResetStarted()`（同模块 `internal`）用来断言 onCreate 真的接线了——否则测试无法区分"onCreate 调了"和"测试自己触发了 lazy"。
+
+**验证**
+
+| 手段 | 结果 |
+|---|---|
+| 单测 | **132，0 失败**（新增 5：离开问题页只清自己那个 feed、`clearQuery` 的存储级断言、压缩按磁盘字节、容器清库、onCreate 接线） |
+| 变异验证（三次） | 去掉 teardown 删除 → ✗ 失败；去掉 VACUUM+checkpoint → ✗（WAL 残留 **524288** 字节）；去掉 onCreate 调用 → ✗ 失败 |
+| 三个变体 | `assembleDebug` / `assembleRelease` / `assemblePerfetto` 全部成功 |
+| **真机磁盘** | 冷启前后：`zhihu-lite.db` **110,592 → 40,960** 字节，`-wal` **502,672 → 82,432**（清空瞬间被截断为 0，随后重新加载写回 82KB）；冷启 564ms、无崩溃 |
+
+**仍没做（已知缺口，需要 schema 变更）**：`feed_query` 的**条数**没有上限、也没有时间过期——只有"每个 feed 最多 300 行"（`trim`）和"冷启动全清"。要加就得给 `feed_query` 增一列 `last_access_at`（schema v2 + 真迁移），留到你确实需要多问题缓存时再做。
+
 ## 8. 风险与对策
 
 | 风险 | 影响 | 对策 |
@@ -2073,3 +2223,11 @@ assemble → business_ui → business_logic → base_ui → base_logic → model
 1. **suspend 调用不要放在"会被回收的 item"的作用域里。** 需要跨越 item 生命周期的状态与协程，放在列表（或 ViewModel）那一层。
 2. **`LazyColumn` 里的每个 item 都给显式 `key`。** 不给 key 就等于用下标当身份，而列表长度只会变。
 3. **"取消"必须有收尾。** 状态机里每个出口（成功/失败/异常/取消）都要把可见状态落回一个可继续的状态；否则取消会留下一个用户无法摆脱的界面。这条现在是 `ListFooterPagerTest` 的断言之一。
+
+**第十次修订：把"分层规则"从文档搬进构建图。** 前九次修订都在改*代码结构*，靠的是约定 + 复查 + grep；§7.22 之后，规则由 Gradle 模块边界执行：被禁的那层不在编译类路径上，写错方向就是 `Unresolved reference`。这次修订同时验证了两件事：
+
+1. **规则写成代码后立刻抓到一处存量违规**（`business_logic → business_ui`：会话/凭证契约声明在 `business_ui`）。之前九次修订都没发现它——因为人眼读单向依赖时最容易漏掉"接口在上、实现在下"这种**跨层反向**的形态。
+2. **拆分会让"隐式覆盖"变成"显式配置"**：perfetto 插桩的 `InstrumentationScope.PROJECT` 在单模块下等价于"全部代码"，拆完只剩应用模块自己。凡是"因为只有一个模块所以自然也包含 X"的写法，拆分时都要重新问一遍——这类静默减配比编译错误难发现得多。
+
+因此更新一条总则：**凡是可以由构建图表达的约束，就不要只写在文档里。** 文档负责解释"为什么这样分"，编译器负责"不许分错"。
+
