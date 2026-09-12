@@ -4,49 +4,62 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.navigation.NavHostController
-import androidx.navigation.Navigator
-import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
+import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.compose.rememberNavController
-import com.nigao.gaia.GaiaEvent
-import com.nigao.gaia.GaiaEventManager
-import org.nigao.zhihuLite.login.LogInManager
-import org.nigao.zhihuLite.feedItem.Question
-import org.nigao.zhihuLite.registerRoute.RouteRegisterManager
-import org.nigao.zhihuLite.registerRoute.Routes
+import org.nigao.zhihuLite.assemble.navigation.AssembleAppNavHost
+import org.nigao.zhihuLite.base_navigation.AppRoute
+import org.nigao.zhihuLite.base_navigation.LogInRoute
+import org.nigao.zhihuLite.base_navigation.MainFeedRoute
+import org.nigao.zhihuLite.business_ui.login.SessionState
+import org.nigao.zhihuLite.business_ui.login.SessionStore
 
-data class NavExtra(
-    val question: Question,
-): Navigator.Extras
-
+/**
+ * Application shell: theme + navigation graph.
+ *
+ * Routes are registered by [AssembleAppNavHost] directly (no event bus, no code generation), and the
+ * start destination is resolved once. Reading the session per recomposition was main-thread disk
+ * I/O; `SessionStore.isLoggedIn()` also degrades to "no session" under Preview/JVM tests instead of
+ * throwing on an uninitialised settings context.
+ */
 @Composable
 @Preview
 fun App(
     modifier: Modifier = Modifier,
-    navController: NavHostController = rememberNavController()
 ) {
-    GaiaEventManager.start(GaiaEvent(key = "register_route"))
+    val navController = rememberNavController()
+    val startDestination: AppRoute = remember {
+        if (SessionStore.isLoggedIn()) MainFeedRoute else LogInRoute
+    }
+    val sessionState by SessionStore.state.collectAsState()
+
+    // Expiry/failure detection: the network layer calls SessionStore.invalidate(...) on HTTP 401/403
+    // or a login-wall body, and this returns to sign-in. Without it the feed kept spinning forever
+    // against a login wall.
+    LaunchedEffect(sessionState) {
+        if (sessionState !is SessionState.Invalid) return@LaunchedEffect
+        if (navController.currentBackStackEntry?.destination?.hasRoute<LogInRoute>() == true) {
+            return@LaunchedEffect
+        }
+        navController.navigate(LogInRoute) {
+            // Clear the whole back stack so the expired session's screens are not reachable.
+            popUpTo(0) { inclusive = true }
+            launchSingleTop = true
+        }
+    }
+
     MaterialTheme {
-        Scaffold(
-            modifier = Modifier.fillMaxSize()
-        ) { contentPadding ->
-            contentPadding
-            NavHost(
+        Scaffold(modifier = Modifier.fillMaxSize()) {
+            AssembleAppNavHost(
                 navController = navController,
-                startDestination = if (LogInManager.isLoggedIn()) Routes.MAIN_FEED else Routes.LOG_IN
-            ) {
-                RouteRegisterManager.routeRegistries().forEach { routeRegistry ->
-                    composable(
-                        route = routeRegistry.route,
-                        arguments = routeRegistry.arguments,
-                    ) { backStackEntry ->
-                        routeRegistry.content(navController, backStackEntry)
-                    }
-                }
-            }
+                startDestination = startDestination,
+                modifier = modifier.fillMaxSize(),
+            )
         }
     }
 }

@@ -5,6 +5,7 @@ plugins {
     alias(libs.plugins.composeCompiler)
     alias(libs.plugins.serialization)
     id("com.google.devtools.ksp")
+    alias(libs.plugins.room)
 }
 
 // Release signing, driven by CI environment variables (see .github/workflows/release.yml).
@@ -12,6 +13,12 @@ plugins {
 val releaseKeystore = System.getenv("RELEASE_KEYSTORE_PATH")
     ?.let { file(it) }
     ?.takeIf { it.isFile }
+
+room {
+    // Exported schemas are committed so schema changes can be diffed and migrations tested;
+    // exportSchema = true on the @Database class requires this location.
+    schemaDirectory("$projectDir/schemas")
+}
 
 android {
     namespace = "org.nigao.zhihuLite"
@@ -75,6 +82,13 @@ android {
     lint {
         disable.add("NullSafeMutableLiveData")
     }
+
+    testOptions {
+        unitTests {
+            // Robolectric needs the merged resources to build an Android Context in a JVM test.
+            isIncludeAndroidResources = true
+        }
+    }
 }
 
 dependencies {
@@ -105,11 +119,16 @@ dependencies {
     implementation(libs.multiplatform.settings.no.arg)
     implementation(libs.androidx.material3)
 
-    testImplementation(libs.kotlin.testJunit)
-    androidTestImplementation(libs.androidx.junit.ktx)
+    implementation(libs.room.runtime)
+    implementation(libs.room.ktx)
+    ksp(libs.room.compiler)
+    testImplementation(libs.room.testing)
 
-    implementation(project(":app:gaia"))
-    ksp(project(":app:gaia"))
+    testImplementation(libs.kotlin.testJunit)
+    testImplementation(libs.robolectric)
+    testImplementation(libs.androidx.test.core)
+    testImplementation(libs.kotlinx.coroutines.test)
+    androidTestImplementation(libs.androidx.junit.ktx)
 
     constraints {
         // Pin the transitive concurrent-futures pulled in via profileinstaller to a stable version.

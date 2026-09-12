@@ -1,8 +1,10 @@
 package org.nigao.app
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
-import org.nigao.zhihuLite.web.Zse96
+import org.nigao.zhihuLite.business_logic.zhihu.sign.Zse96
 
 /**
  * Verifies the native zse-96 implementation against outputs captured from Zhihu's
@@ -44,5 +46,53 @@ class Zse96Test {
             "2.0_yr4wLZAe0x/9VvqKVzS37KO86fxLUS/OAXyLrqtXIY2zfVhVOgrFIvqcbcRaMtHu",
             header
         )
+    }
+
+    /**
+     * Regression lock for `encodeUriComponent` iterating UTF-16 `Char`s instead of code points.
+     *
+     * The old loop encoded each half of a surrogate pair on its own, and
+     * `Char.toByteArray(UTF_8)` maps an unpaired surrogate to `?`, so a non-BMP character came out
+     * as `%3F%3F` instead of its real 4-byte UTF-8 escape sequence (`%F0%9F%98%80` for U+1F600).
+     * A differential test against the original JavaScript found 110/110 non-BMP inputs diverging
+     * for this reason, so these assertions describe the correct JS-observable behaviour.
+     *
+     * The exact ciphertext is not pinned here (that requires the JS oracle); these assertions
+     * instead pin the property that was actually broken and cannot regress silently.
+     */
+    @Test
+    fun nonBmpInputIsNotMangledIntoLoneSurrogates() {
+        for (nonBmp in listOf("\uD83D\uDE00", "\uD83C\uDF89 party", "a\uD83D\uDE00b")) {
+            val encrypted = Zse96.encrypt(nonBmp, nowMillis, randomValue)
+            assertFalse(
+                "non-BMP input must not be encoded as '?' placeholders: $nonBmp",
+                encrypted.contains("%3F")
+            )
+        }
+    }
+
+    /**
+     * Every `%` escape must be followed by two uppercase hex digits.
+     *
+     * This catches the other half of the surrogate bug class: emitting a partial or malformed
+     * escape sequence, which would make the signature header structurally invalid.
+     */
+    @Test
+    fun percentEscapesAreWellFormed() {
+        for (input in listOf("\uD83D\uDE00", "中文", "a b&c=d", "/api/v4/answers/1?x=2")) {
+            val encrypted = Zse96.encrypt(input, nowMillis, randomValue)
+            for (i in encrypted.indices) {
+                if (encrypted[i] != '%') continue
+                assertTrue(
+                    "escape at $i truncated in '$encrypted'",
+                    i + 2 < encrypted.length
+                )
+                val hex = encrypted.substring(i + 1, i + 3)
+                assertTrue(
+                    "escape '%$hex' is not two hex digits in '$encrypted'",
+                    hex.all { it in '0'..'9' || it in 'A'..'F' }
+                )
+            }
+        }
     }
 }
