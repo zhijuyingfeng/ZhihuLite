@@ -3011,6 +3011,38 @@ Column(Modifier.padding(vertical = 8.dp)) { … } // ← 外层 Column 又一个
 
 **教训（值得记）**：前两次"复现不了"，是因为我的 harness 把文本包在 `<p>` 里 ✗，而真实 payload 里短评论是裸文本 ✗ —— **测试要贴着真实数据形态**，否则"我验过了"其实是"我验了另一种形状" ✓。这次的插桩日志（表已加载、函数没被调用）是定位的关键 ✓（而不是继续猜图片/缓存/取消 ✗）。
 
+### 7.53 已读上报（`/lastread/touch`）：实现、与浏览器的差异、以及三处修正
+
+用户贴出浏览器上报已读的 curl，问本 App 有没有实现、有没有差异。
+
+**实现了** ✓，在 `business_logic/feed/EventReporter.kt`：
+
+| 方法 | 请求 |
+|---|---|
+| `reportShow` | `POST /lastread/touch`，`items=[["answer","<id>","touch"]]` |
+| `reportRead` | `POST /lastread/touch`，`items=[…,"read"]` **+** `POST /api/v4/read_history/add`，`{"content_token":"<id>","content_type":"answer"}` |
+
+触发点：`AnswerFeedViewModel.reportCardShow`（卡片可见 → show + read）+ `FeedOperations`（首次 read）；`reportedKeys` 去重（每 item 每 kind 每进程一次 ✓）。
+
+**与浏览器 curl 的差异（实测过的）**
+
+| 项 | 结论 |
+|---|---|
+| **没有 `x-zse-93`/`x-zse-96` 签名** | **不影响** ✓ 真机实测 `201 {"success":true}` —— 这个端点不需要签名（与必须签名的 v4 接口不同） |
+| 手写 `Content-Type: multipart/form-data`（无 boundary） | 服务端容忍（同样 201）✓，但属多余且误导 ✗ |
+| `Origin`/`Sec-Fetch-*`/`Priority`/UA/Cookie | 与浏览器等价 ✓ |
+| 每次一条 item（浏览器可能批量） | 未验证差异，功能无碍 ✓ |
+| **忽略响应** ✗ | 失败完全静默 ✗ —— 这类问题能藏很久的原因 |
+| `/api/v4/read_history/add` | 实测 **200，body 是字面 `null`** ✓ —— 不是 401/403（没被拒 ✓），但**没有成功标志** ✗，所以"到底写没写进去"无法从响应断言 ✓ |
+
+**三处修正（用户确认后改）**
+
+1. **删掉手写的 `Content-Type`** ✓ —— 交给 `MultiPartFormDataContent` 自己带 boundary ✓（实测删掉后依旧 200/201 ✓）。
+2. **看响应** ✓：非 2xx 用 `Napier.w` 记状态+片段 ✓；`read_history/add` 的成功也按 `Napier.d` 记一条（带那个 `null` ✓），把原来的 `printStackTrace` 换成 `Napier.e` ✓ —— 现在能查了 ✓。
+3. **明确不把遥测接到 `ZhihuApi.request` 上** ✓（并在类注释里写清原因 ✓）：那个方法在 401/403 时会 **invalidate 登录态** ✗，等于把"上报失败"升级成"被登出" ✗；直连 + 只记日志更稳 ✓。
+
+**验证**：221 测试 0 失败 ✓；真机日志确认上报仍在发 ✓、`read_history/add answered 200 with 'null'` ✓、**没有任何 warning** ✓。
+
 ## 8. 风险与对策
 
 | 风险 | 影响 | 对策 |
