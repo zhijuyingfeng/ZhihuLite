@@ -492,6 +492,34 @@ data class Paging(
         get() = previous.isNotBlank() && !isStart
 }
 
+/**
+ * One page of replies to a root comment.
+ *
+ * A **different envelope** from [CommentResponse]: the child endpoint answers with
+ * `counts`/`data`/`paging`/`sorter` and the parent comment under `root`, and carries none of the root
+ * response's `comment_status`/`edit_status`. Decoding it as [CommentResponse] fails on those missing
+ * fields, which is why this type exists. `paging.next` is an opaque composite cursor — follow it
+ * verbatim and stop at `is_end`.
+ */
+@Serializable
+data class ChildCommentResponse(
+    @SerialName("counts")
+    val counts: Counts? = null,
+
+    @SerialName("data")
+    val data: List<Comment> = emptyList(),
+
+    @SerialName("paging")
+    val paging: Paging = Paging(),
+
+    @SerialName("sorter")
+    val sorter: List<Sorter> = emptyList(),
+
+    /** The comment these replies belong to (the server sends it back with every page). */
+    @SerialName("root")
+    val root: Comment? = null
+)
+
 @Serializable
 data class Sorter(
     @SerialName("type")

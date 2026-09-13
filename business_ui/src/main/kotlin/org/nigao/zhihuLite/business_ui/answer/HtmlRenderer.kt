@@ -190,6 +190,10 @@ private fun HtmlNodesToComposeUi(
                             LinkElement(node, textStyle, linkStyle, onLinkClick)
                         }
                         "img" -> ImageElement(node, textStyle, imageLoader)
+                        // A line break between two block-level fragments. Comment bodies arrive as
+                        // `text<br>text`, so without this the break was lost and (in debug) the
+                        // element fell through to the unknown-tag box.
+                        "br" -> Spacer(Modifier.height(8.dp))
                         "div" -> BlockElement(answerId, node, textStyle, linkStyle, imageLoader, onLinkClick, depth)
                         else -> UnknownElement(answerId, node, textStyle, linkStyle, imageLoader, onLinkClick, depth)
                     }
@@ -569,6 +573,7 @@ private fun collectStyledText(
                 "s" -> builder.withStyle(SpanStyle(textDecoration = TextDecoration.LineThrough)) {
                     node.children.forEach { collectStyledText(it, baseStyle, linkStyle, this) }
                 }
+                "br" -> builder.append('\n')
                 "a" -> {
                     val href = node.attributes["href"] ?: ""
                     builder.pushStringAnnotation(tag = LINK_ANNOTATION_TAG, annotation = href)

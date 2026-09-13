@@ -1,5 +1,6 @@
 package org.nigao.zhihuLite.business_ui.login
 
+import io.github.aakira.napier.Napier
 import org.nigao.zhihuLite.business_logic.login.LogInManager
 import org.nigao.zhihuLite.business_logic.login.SessionStore
 
@@ -39,8 +40,11 @@ fun LogInScreen(
             LogInManager.logIn(it)
             onLoggedIn()
         },
-        timeoutMessage = stringResource(R.string.login_timeout_message),
+        loadErrorMessage = stringResource(R.string.login_load_failed),
         retryLabel = stringResource(R.string.login_retry),
+        // The WebView reports why a load failed through here; without it a reader's "the sign-in page
+        // will not open" leaves nothing behind but the generic banner.
+        onLog = { Napier.i("Sign-in: $it") },
         modifier = modifier
     )
 }

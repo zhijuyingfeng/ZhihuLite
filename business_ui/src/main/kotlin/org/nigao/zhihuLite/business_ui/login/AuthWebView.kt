@@ -6,6 +6,7 @@ import android.view.ViewGroup
 import android.webkit.CookieManager
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -30,7 +31,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
-import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
@@ -41,8 +41,8 @@ private const val HOST = "https://www.zhihu.com"
 /** How often the cookie jar is inspected for a completed sign-in while the page is open. */
 private const val SESSION_POLL_INTERVAL_MS = 500L
 
-/** How long the user may sit on the sign-in page before an actionable error is shown. */
-private const val AUTH_TIMEOUT_MS = 30_000L
+/** How long the sign-in page may take to load before the blank screen is called out as a failure. */
+private const val AUTH_LOAD_TIMEOUT_MS = 30_000L
 
 /**
  * Sign-in WebView with a bounded lifetime and a session-cookie success signal.
@@ -51,8 +51,14 @@ private const val AUTH_TIMEOUT_MS = 30_000L
  * sign-in URL and the next page finished at exactly `https://www.zhihu.com/`; any redirect carrying
  * a query or fragment, or a differently shaped OAuth flow, left the user on the sign-in page
  * forever with no feedback. This version treats "the cookie jar now contains the `z_c0` session
- * cookie" as the success signal, keeps the page-URL checks only as the trigger for when to look,
- * polls until the cookie appears, and shows a retryable error after [AUTH_TIMEOUT_MS].
+ * cookie" as the success signal, keeps the page-URL checks only as the trigger for when to look, and
+ * polls until the cookie appears however long that takes.
+ *
+ * The only timer left is on the *load*: signing in is something the reader does at their own pace
+ * (typing a password, waiting for an SMS, scanning a code), so a clock on it fires at innocent
+ * people — while a load that simply stalls is the case a timer is genuinely good for, because there
+ * is nothing else to observe. Once a page has loaded the reader may take as long as they like; a page
+ * that fails to load reports itself through `WebViewClient` and shows the same retryable error.
  */
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
@@ -60,7 +66,7 @@ fun AuthWebView(
     url: String,
     onAuthComplete: (String) -> Unit,
     modifier: Modifier,
-    timeoutMessage: String? = null,
+    loadErrorMessage: String? = null,
     retryLabel: String? = null,
     onLog: (String) -> Unit = {},
 ) {
@@ -79,7 +85,9 @@ fun AuthWebView(
                     webViewClient = AuthWebViewClient(
                         onLog = onLog,
                         onPageActive = { session.onPageActive() },
+                        onPageLoaded = { session.onPageLoaded() },
                         onSessionCookie = { session.onSessionCookie(it) },
+                        onLoadFailed = { session.onLoadFailed(it) },
                     )
                     val cookieManager = CookieManager.getInstance()
                     cookieManager.setAcceptCookie(true)
@@ -103,26 +111,32 @@ fun AuthWebView(
             },
         )
 
-        // Bounded poll for the session cookie. It starts once the page flow says a sign-in is
-        // underway; `attempt` changes only on retry, so page navigations cannot keep pushing the
-        // timeout out and hide a stuck flow.
+        // The cookie poll. It starts once the page flow says a sign-in is underway — that gate also
+        // keeps a stale cookie from being mistaken for a fresh one while the sign-in screen clears
+        // the old session — and then runs until the session cookie appears. No deadline: how long
+        // signing in takes is the reader's business.
         LaunchedEffect(attempt) {
-            withTimeoutOrNull(AUTH_TIMEOUT_MS) {
-                session.awaitPageActive()
-                while (!session.isCompleted) {
-                    val cookie = CookieManager.getInstance().getCookie(HOST)
-                    if (cookie != null && cookie.containsSessionCookie()) {
-                        session.onSessionCookie(cookie)
-                        break
-                    }
-                    delay(SESSION_POLL_INTERVAL_MS)
+            session.awaitPageActive()
+            while (!session.isCompleted) {
+                val cookie = CookieManager.getInstance().getCookie(HOST)
+                if (cookie != null && cookie.containsSessionCookie()) {
+                    session.onSessionCookie(cookie)
+                    break
                 }
+                delay(SESSION_POLL_INTERVAL_MS)
             }
-            if (!session.isCompleted) {
-                // Written from inside the effect, but the effect is keyed on `attempt`, so this does
-                // not restart the poll and can never trip Compose's self-invalidating-effect guard.
-                session.onTimeout(timeoutMessage ?: "Sign-in timed out. Please try again.")
-                onLog("Sign-in timed out waiting for the session cookie")
+        }
+
+        // A page that never finishes loading would leave a blank WebView with no way forward, so that
+        // one case keeps a deadline. It is re-armed by an explicit retry, and once any page has loaded
+        // it no longer applies.
+        LaunchedEffect(attempt) {
+            withTimeoutOrNull(AUTH_LOAD_TIMEOUT_MS) { session.awaitPageLoaded() }
+            if (!session.isPageLoaded) {
+                session.onLoadFailed(
+                    loadErrorMessage ?: "Could not load the sign-in page. Check your connection.",
+                )
+                onLog("Sign-in page did not finish loading within ${AUTH_LOAD_TIMEOUT_MS}ms")
             }
         }
 
@@ -169,63 +183,6 @@ fun AuthWebView(
 }
 
 /**
- * Sign-in detection state shared by the WebView callbacks and the polling effects.
- *
- * A plain state holder rather than a callback-local `var` so the WebView's main-thread callbacks and
- * the Compose effects observe the same snapshotted values, and so success is latched exactly once
- * (the previous unsynchronised `isLoggedIn` flag could double-report completion).
- */
-private class SignInSession {
-
-    /** Set once any sign-in page or resource is seen; the polling effect waits for this. */
-    var isPageActive by mutableStateOf(false)
-        private set
-
-    /** Set when a session cookie was observed; the hand-off effect is keyed on this. */
-    var isCompleted by mutableStateOf(false)
-        private set
-
-    /** User-visible failure text, non-null only while the error overlay should show. */
-    var errorMessage by mutableStateOf<String?>(null)
-        private set
-
-    /** The first session cookie observed, handed to the caller exactly once. */
-    var completedCookie: String? by mutableStateOf(null)
-        private set
-
-    private var pageSignals = Channel<Unit>(Channel.CONFLATED)
-
-    fun onPageActive() {
-        isPageActive = true
-        pageSignals.trySend(Unit)
-    }
-
-    suspend fun awaitPageActive() {
-        if (isPageActive) return
-        pageSignals.receive()
-    }
-
-    /** Latches the first session cookie; later observations (poll and page callback) are ignored. */
-    fun onSessionCookie(cookie: String) {
-        if (isCompleted) return
-        completedCookie = cookie
-        isCompleted = true
-        errorMessage = null
-    }
-
-    fun onTimeout(message: String) {
-        if (!isCompleted) errorMessage = message
-    }
-
-    /** Clears the error and re-arms the page signal for another explicit attempt. */
-    fun resetForRetry() {
-        errorMessage = null
-        isPageActive = false
-        pageSignals = Channel(Channel.CONFLATED)
-    }
-}
-
-/**
  * Drives sign-in detection for [AuthWebView].
  *
  * Success needs the `z_c0` session cookie; the URL checks only decide *when* it is worth looking for
@@ -235,7 +192,9 @@ private class SignInSession {
 private class AuthWebViewClient(
     private val onLog: (String) -> Unit,
     private val onPageActive: () -> Unit,
+    private val onPageLoaded: () -> Unit,
     private val onSessionCookie: (String) -> Unit,
+    private val onLoadFailed: (String) -> Unit,
 ) : WebViewClient() {
 
     private var signInSeen = false
@@ -248,6 +207,7 @@ private class AuthWebViewClient(
     }
 
     override fun onPageFinished(view: WebView?, url: String?) {
+        onPageLoaded()
         if (isSignInUrl(url)) signInSeen = true
         // Fallback for flows where the sign-in request itself is never observed: once the user is
         // back on the home page, or sign-in was seen at all, check the cookie jar.
@@ -270,9 +230,23 @@ private class AuthWebViewClient(
         request: WebResourceRequest?,
         error: WebResourceError?,
     ) {
-        if (request?.isForMainFrame == true) {
-            onLog("Sign-in page failed to load: ${error?.description}")
-        }
+        // Only the document itself: a failing image or script does not stop anyone signing in.
+        if (request?.isForMainFrame != true) return
+        val description = error?.description?.toString().orEmpty()
+        onLog("Sign-in page failed to load: $description")
+        onLoadFailed(description)
+    }
+
+    override fun onReceivedHttpError(
+        view: WebView?,
+        request: WebResourceRequest?,
+        errorResponse: WebResourceResponse?,
+    ) {
+        if (request?.isForMainFrame != true) return
+        val statusCode = errorResponse?.statusCode ?: return
+        if (statusCode < 400) return
+        onLog("Sign-in page returned HTTP $statusCode")
+        onLoadFailed("HTTP $statusCode")
     }
 
     private fun completeIfSessionCookie(url: String?) {

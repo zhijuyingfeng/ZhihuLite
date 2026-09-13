@@ -4,6 +4,8 @@ import org.nigao.zhihuLite.model.comment.Comment
 import org.nigao.zhihuLite.model.comment.CommentResponse
 import org.nigao.zhihuLite.model.comment.CommentTag
 import org.nigao.zhihuLite.business_logic.comment.CommentSortType
+import org.nigao.zhihuLite.business_logic.comment.CommentContentPart
+import org.nigao.zhihuLite.business_logic.comment.commentContentParts
 sealed class CommentViewUiState {
     object Loading: CommentViewUiState()
     data class Success(
@@ -11,6 +13,13 @@ sealed class CommentViewUiState {
         val sortType: CommentSortType,
         val totalCount: Int,
         val hasMore: Boolean,
+        /**
+         * Replies per root comment id.
+         *
+         * A map rather than a field on [CommentUiState] so expanding one comment does not rewrite the
+         * whole list (and so its `LazyColumn` key and composition stay put).
+         */
+        val children: Map<String, CommentChildrenState> = emptyMap(),
     ): CommentViewUiState()
     class Failed(val message: String): CommentViewUiState()
 }
@@ -23,7 +32,11 @@ data class CommentUiState(
     val createdTimestamp: Long,
     val tags: List<CommentTagUiState>,
     val likeCount: Int,
-    val content: String,
+    /**
+     * The body, split where attached pictures sit: the renderer draws images as blocks, and one
+     * nested inside the paragraph holding the text is dropped, so the pictures are drawn separately.
+     */
+    val content: List<CommentContentPart>,
     /**
      * Only the count is kept here. The previous implementation eagerly and recursively
      * materialised every child comment into this tree even though `CommentView` never renders
@@ -32,6 +45,27 @@ data class CommentUiState(
      */
     val childCommentCount: Int,
     val authorTags: List<CommentTagUiState>,
+    /**
+     * Who this comment replies to, when that is another *reply*. A reply aimed at the root comment
+     * carries none: the indentation under that comment already says so.
+     */
+    val replyToAuthor: String? = null,
+)
+
+/**
+ * One root comment's replies, and where the reader is with them.
+ *
+ * Flags rather than a sealed hierarchy because a row needs several of these at once (loaded list,
+ * "show more", in-flight spinner, retry after a failure); the alternative is a type per combination.
+ */
+data class CommentChildrenState(
+    val comments: List<CommentUiState> = emptyList(),
+    val isExpanded: Boolean = false,
+    val isLoading: Boolean = false,
+    val hasMore: Boolean = false,
+    val failed: Boolean = false,
+    /** The server's opaque cursor for the next page; null until a page has been loaded. */
+    val nextCursor: String? = null,
 )
 
 data class CommentTagUiState(
@@ -47,7 +81,7 @@ fun CommentResponse.commentUiStates(): List<CommentUiState> {
         }
 }
 
-fun Comment.toUiState(): CommentUiState {
+fun Comment.toUiState(replyToAuthor: String? = null): CommentUiState {
     return CommentUiState(
         id = id,
         authorAvatarUrl = author.avatarUrl,
@@ -57,11 +91,14 @@ fun Comment.toUiState(): CommentUiState {
             tag.toUiState()
         },
         likeCount = likeCount,
-        content = content,
+        // A picture attached to a comment arrives as an anchor labelled "查看图片"; drawing it as a
+        // link is useless, so the body is split and the picture drawn on its own.
+        content = commentContentParts(content),
         childCommentCount = childCommentCount,
         authorTags = authorTag.map { tag ->
             tag.toUiState()
-        }
+        },
+        replyToAuthor = replyToAuthor,
     )
 }
 
