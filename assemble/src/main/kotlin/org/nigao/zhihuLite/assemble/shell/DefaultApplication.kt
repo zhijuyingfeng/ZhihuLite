@@ -42,5 +42,9 @@ class DefaultApplication : Application(), ContainerHolder<AppContainer> {
         // container's scope; the feed screen awaits the same job before it subscribes (see
         // AppContainer.discardPreviousSessionFeeds).
         container.discardPreviousSessionFeeds()
+
+        // The same boundary for images: the files the previous session cached on disk go now, while
+        // this session's accumulate as usual (see AppContainer.discardPreviousSessionImages).
+        container.discardPreviousSessionImages()
     }
 }

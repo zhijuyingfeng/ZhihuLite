@@ -40,6 +40,12 @@ interface ImageLoader {
          * correct its layout. See `ImageElement`.
          */
         onIntrinsicSize: (width: Int, height: Int) -> Unit = { _, _ -> },
+        /**
+         * Called if the image cannot be loaded (no network, a dead url), with the cause so the caller
+         * can ignore a cancellation — a request cancelled because its line scrolled away is not a
+         * broken image. An inline caller uses this to fall back to text rather than leave a hole.
+         */
+        onError: (cause: Throwable?) -> Unit = {},
     )
 }
 
@@ -53,6 +59,7 @@ object CoilImageLoader: ImageLoader {
         targetWidth: Int?,
         targetHeight: Int?,
         onIntrinsicSize: (width: Int, height: Int) -> Unit,
+        onError: (cause: Throwable?) -> Unit,
     ) {
         val context = LocalPlatformContext.current
         val density = LocalDensity.current
@@ -73,6 +80,7 @@ object CoilImageLoader: ImageLoader {
             modifier = modifier,
             contentScale = contentScale,
             onSuccess = { state -> onIntrinsicSize(state.result.image.width, state.result.image.height) },
+            onError = { state -> onError(state.result.throwable) },
         )
     }
 }

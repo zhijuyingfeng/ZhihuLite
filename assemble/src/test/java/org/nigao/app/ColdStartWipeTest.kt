@@ -47,6 +47,16 @@ class ColdStartWipeTest {
     }
 
     @Test
+    fun `the application also drops the previous session's images in onCreate`() {
+        val application = ApplicationProvider.getApplicationContext<DefaultApplication>()
+
+        assertTrue(
+            "DefaultApplication.onCreate must call discardPreviousSessionImages()",
+            application.container.coldStartImageResetStarted(),
+        )
+    }
+
+    @Test
     fun `the application starts the wipe in onCreate`() {
         val application = ApplicationProvider.getApplicationContext<DefaultApplication>()
 

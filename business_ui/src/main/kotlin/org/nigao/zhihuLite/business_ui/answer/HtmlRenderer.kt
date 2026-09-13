@@ -60,6 +60,17 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.unit.takeOrElse
+import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.text.PlaceholderVerticalAlign
+import androidx.compose.ui.text.Placeholder
+import androidx.compose.foundation.text.InlineTextContent
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.text.appendInlineContent
+import kotlinx.coroutines.CancellationException
 
 /**
  * Renders parsed answer/comment HTML as Compose UI.
@@ -77,6 +88,29 @@ private const val LINK_ANNOTATION_TAG = "URL"
  * to flattened text, so hostile input cannot overflow the stack on the UI thread.
  */
 private const val MAX_RENDER_DEPTH = 64
+
+/**
+ * The emoji table `collectStyledText` resolves `[名字]` markers against.
+ *
+ * A bundled constant, so it is the same for every render; `HtmlToComposeUi` fills it from the raw
+ * resource before any of its children are drawn. Threading it through every element function would be
+ * eight signatures of noise for a value that never varies.
+ */
+private var zhihuEmojiTable: Map<String, String> = emptyMap()
+
+/**
+ * Emoji images that could not be loaded, by url.
+ *
+ * A sticker that fails is drawn as its marker text instead — `[调皮]` rather than a hole — which
+ * means the line has to be rebuilt without it. Session-scoped on purpose: the next process start
+ * tries again, and until then the reader at least sees what the emoji was.
+ */
+private var failedStickerUrls by mutableStateOf<Set<String>>(emptySet())
+
+/** Tags a `div` may contain and still be rendered as running text rather than a block container. */
+private val INLINE_TAGS = setOf(
+    "a", "b", "strong", "i", "em", "u", "s", "span", "sup", "sub", "br", "code", "img",
+)
 
 /** Elements that contribute nothing visible to a feed/answer. */
 private val NON_RENDERED_TAGS = setOf("script", "style", "head", "title", "meta", "link", "base")
@@ -115,6 +149,10 @@ fun HtmlToComposeUi(
         value = null
         value = withContext(Dispatchers.Default) { HtmlParseCache.parse(html) }
     }
+
+    val context = androidx.compose.ui.platform.LocalContext.current
+    zhihuEmojiTable = remember(context) { ZhihuEmoji.table(context) }
+
 
     document?.let { nodes ->
         HtmlNodesToComposeUi(
@@ -170,11 +208,23 @@ private fun HtmlNodesToComposeUi(
         nodes.forEachIndexed { index, node ->
             when (node) {
                 is HtmlNode.TextNode -> {
+                    // Text that arrives without a block around it — which is how a short comment body
+                    // comes back (`什么核心地段？[尴尬]保安拿多少钱工资？`) — still has to go through the
+                    // inline builder, or its emoji would be the one place they stay as text.
                     if (node.content.isNotBlank()) {
-                        Text(
-                            text = node.content,
+                        val stickers = remember(node) { linkedSetOf<String>() }
+                        val annotatedText = remember(node, textStyle, linkStyle, failedStickerUrls) {
+                            stickers.clear()
+                            buildAnnotatedString {
+                                appendTextWithStickers(node.content, this, stickers, zhihuEmojiTable)
+                            }
+                        }
+                        LinkAwareText(
+                            text = annotatedText,
                             style = textStyle,
                             modifier = Modifier.padding(top = if (index == 0) 0.dp else 4.dp),
+                            onLinkClick = onLinkClick,
+                            inlineContent = stickerInlineContent(stickers, textStyle, imageLoader),
                         )
                     }
                 }
@@ -195,11 +245,11 @@ private fun HtmlNodesToComposeUi(
                         // still takes a line, which is most of the white the reader sees between
                         // images. `<p>text<br/></p>` has text and is kept.
                         "p" -> if (remember(node) { collectTextContent(node).isNotBlank() }) {
-                            ParagraphElement(node, textStyle, linkStyle, onLinkClick)
+                            ParagraphElement(node, textStyle, linkStyle, onLinkClick, imageLoader)
                         }
                         "ul" -> ListElement(node, textStyle, linkStyle, ordered = false, onLinkClick = onLinkClick)
                         "ol" -> ListElement(node, textStyle, linkStyle, ordered = true, onLinkClick = onLinkClick)
-                        "li" -> ListItemElement(node, textStyle, linkStyle, onLinkClick, answerId)
+                        "li" -> ListItemElement(node, textStyle, linkStyle, onLinkClick, answerId, imageLoader)
                         "pre" -> MonospaceElement(node, textStyle)
                         // A video-box anchor wraps a thumbnail image; sending it to LinkElement
                         // would render a broken link instead of a playable video.
@@ -208,7 +258,12 @@ private fun HtmlNodesToComposeUi(
                         } else {
                             LinkElement(node, textStyle, linkStyle, onLinkClick)
                         }
-                        "img" -> ImageElement(node, textStyle, imageLoader)
+                        // An emoji is a picture the size of the text around it, not an illustration.
+                        "img" -> if (isStickerImage(node)) {
+                            InlineElement(node, textStyle, linkStyle, onLinkClick, imageLoader)
+                        } else {
+                            ImageElement(node, textStyle, imageLoader)
+                        }
                         // Wrappers that must leave no trace: a picture in a `figure`, markup in a
                         // `noscript` fallback. Rendering their children is the whole job.
                         "figure", "noscript" -> TransparentContainer(
@@ -230,13 +285,21 @@ private fun HtmlNodesToComposeUi(
                         // line, a footnote marker, a wrapper `span`. Without this each one drew an
                         // unknown-tag box instead of its text.
                         "b", "strong", "i", "em", "u", "s", "span", "sup" -> InlineElement(
-                            node, textStyle, linkStyle, onLinkClick,
+                            node, textStyle, linkStyle, onLinkClick, imageLoader,
                         )
                         // A line break between two block-level fragments. Comment bodies arrive as
                         // `text<br>text`, so without this the break was lost and (in debug) the
                         // element fell through to the unknown-tag box.
                         "br" -> Spacer(Modifier.height(8.dp))
-                        "div" -> BlockElement(answerId, node, textStyle, linkStyle, imageLoader, onLinkClick, depth)
+                        // Zhihu wraps comment and answer text in `<div class="CommentContent">` with
+                        // the emoji inlined; a div holding nothing but inline content is a paragraph,
+                        // and rendering it as a block container would put every sticker on its own
+                        // line.
+                        "div" -> if (node.children.none { it is HtmlNode.Element && normalizeTagName(it.tagName) !in INLINE_TAGS }) {
+                            ParagraphElement(node, textStyle, linkStyle, onLinkClick, imageLoader)
+                        } else {
+                            BlockElement(answerId, node, textStyle, linkStyle, imageLoader, onLinkClick, depth)
+                        }
                         else -> UnknownElement(answerId, node, textStyle, linkStyle, imageLoader, onLinkClick, depth)
                     }
                 }
@@ -271,18 +334,69 @@ private fun LinkAwareText(
     style: TextStyle,
     modifier: Modifier,
     onLinkClick: (String) -> Unit,
+    inlineContent: Map<String, InlineTextContent> = emptyMap(),
 ) {
-    ClickableText(
+    // `Text` with a tap handler rather than `ClickableText`: the latter is deprecated and has no
+    // `inlineContent`, which is what draws an emoji inside a line of text.
+    var layout by remember { mutableStateOf<TextLayoutResult?>(null) }
+    Text(
         text = text,
         style = style,
-        modifier = modifier,
-        onClick = { offset ->
-            text.getStringAnnotations(LINK_ANNOTATION_TAG, offset, offset)
-                .firstOrNull()
-                ?.item
-                ?.let(onLinkClick)
+        modifier = modifier.pointerInput(text) {
+            detectTapGestures { position ->
+                val result = layout ?: return@detectTapGestures
+                val offset = result.getOffsetForPosition(position)
+                text.getStringAnnotations(LINK_ANNOTATION_TAG, offset, offset)
+                    .firstOrNull()
+                    ?.item
+                    ?.let(onLinkClick)
+            }
         },
+        inlineContent = inlineContent,
+        onTextLayout = { layout = it },
     )
+}
+
+/**
+ * The inline content for the emoji a line of text contains: one emoji-sized picture per url.
+ *
+ * Sized from the text it sits in, so a sticker matches its sentence rather than the screen.
+ */
+@Composable
+private fun stickerInlineContent(
+    urls: Set<String>,
+    style: TextStyle,
+    imageLoader: ImageLoader?,
+): Map<String, InlineTextContent> {
+    if (urls.isEmpty()) return emptyMap()
+    val density = LocalDensity.current
+    val sizeSp = style.fontSize.takeOrElse { 16.sp } * 1.2f
+    val sizeDp = with(density) { sizeSp.toDp() }
+    return urls.associateWith { url ->
+        InlineTextContent(
+            placeholder = Placeholder(
+                width = sizeSp,
+                height = sizeSp,
+                placeholderVerticalAlign = PlaceholderVerticalAlign.TextCenter,
+            ),
+        ) { alternateText ->
+            if (imageLoader != null) {
+                imageLoader.LoadImage(
+                    src = url,
+                    contentDescription = alternateText.ifBlank { null },
+                    modifier = Modifier.size(sizeDp),
+                    contentScale = ContentScale.Fit,
+                    onError = { cause ->
+                        // A cancelled load (the line scrolled away) is not a broken emoji; treating it
+                        // as one would turn stickers into text for the rest of the session.
+                        if (cause !is CancellationException) {
+                            failedStickerUrls = failedStickerUrls + url
+                        }
+                    },
+                )
+            }
+        }
+    }
 }
 
 @Composable
@@ -291,15 +405,19 @@ private fun ParagraphElement(
     baseStyle: TextStyle,
     linkStyle: SpanStyle,
     onLinkClick: (String) -> Unit,
+    imageLoader: ImageLoader?,
 ) {
-    val annotatedText = remember(element, baseStyle, linkStyle) {
-        buildAnnotatedString { collectStyledText(element, baseStyle, linkStyle, this) }
+    val stickers = remember(element) { linkedSetOf<String>() }
+    val annotatedText = remember(element, baseStyle, linkStyle, failedStickerUrls) {
+        stickers.clear()
+        buildAnnotatedString { collectStyledText(element, baseStyle, linkStyle, this, stickers) }
     }
     LinkAwareText(
         text = annotatedText,
         style = baseStyle,
         modifier = Modifier.padding(vertical = 4.dp),
         onLinkClick = onLinkClick,
+        inlineContent = stickerInlineContent(stickers, baseStyle, imageLoader),
     )
 }
 
@@ -372,17 +490,20 @@ private fun ListItemElement(
     linkStyle: SpanStyle,
     onLinkClick: (String) -> Unit,
     answerId: String?,
+    imageLoader: ImageLoader?,
 ) {
     Row(Modifier.padding(start = 16.dp, top = 2.dp, bottom = 2.dp)) {
         Text(text = "• ", style = baseStyle, fontWeight = FontWeight.Bold)
+        val stickers = remember(element) { linkedSetOf<String>() }
         val annotatedText = remember(element, baseStyle, linkStyle) {
-            buildAnnotatedString { collectStyledText(element, baseStyle, linkStyle, this) }
+            buildAnnotatedString { collectStyledText(element, baseStyle, linkStyle, this, stickers) }
         }
         LinkAwareText(
             text = annotatedText,
             style = baseStyle,
             modifier = Modifier,
             onLinkClick = onLinkClick,
+            inlineContent = stickerInlineContent(stickers, baseStyle, imageLoader),
         )
     }
     // answerId is threaded through so nested video/image content keeps working for standalone items.
@@ -613,15 +734,19 @@ private fun InlineElement(
     baseStyle: TextStyle,
     linkStyle: SpanStyle,
     onLinkClick: (String) -> Unit,
+    imageLoader: ImageLoader?,
 ) {
-    val annotatedText = remember(element, baseStyle, linkStyle) {
-        buildAnnotatedString { collectStyledText(element, baseStyle, linkStyle, this) }
+    val stickers = remember(element) { linkedSetOf<String>() }
+    val annotatedText = remember(element, baseStyle, linkStyle, failedStickerUrls) {
+        stickers.clear()
+        buildAnnotatedString { collectStyledText(element, baseStyle, linkStyle, this, stickers) }
     }
     LinkAwareText(
         text = annotatedText,
         style = baseStyle,
         modifier = Modifier.padding(vertical = 2.dp),
         onLinkClick = onLinkClick,
+        inlineContent = stickerInlineContent(stickers, baseStyle, imageLoader),
     )
 }
 
@@ -767,27 +892,76 @@ private fun collectTextContent(root: HtmlNode): String {
     return builder.toString()
 }
 
+/**
+ * Appends [text], turning any `[名字]` the emoji table knows into inline content.
+ *
+ * `stickers == null` means the caller has no way to draw inline content (a plain-text summary, say),
+ * and then the text is appended untouched — markers included, which is how the app showed them
+ * before this existed.
+ */
+/** `class="sticker"`: how Zhihu's article comments inline an emoji. */
+private fun isStickerImage(element: HtmlNode.Element): Boolean =
+    normalizeTagName(element.tagName) == "img" &&
+        element.attributes["class"].orEmpty().contains("sticker")
+
+private fun appendTextWithStickers(
+    text: String,
+    builder: AnnotatedString.Builder,
+    stickers: MutableSet<String>?,
+    emoji: Map<String, String>,
+) {
+    if (stickers == null || emoji.isEmpty()) {
+        builder.append(text)
+        return
+    }
+    splitStickerMarkers(text, emoji).forEach { segment ->
+        when (segment) {
+            is StickerSegment.Text -> builder.append(segment.text)
+            is StickerSegment.Sticker -> {
+                if (segment.url in failedStickerUrls) {
+                    // It failed before: keep the marker readable instead of reserving a hole for it.
+                    builder.append("[${segment.name}]")
+                } else {
+                    builder.appendInlineContent(segment.url, "[${segment.name}]")
+                    stickers += segment.url
+                }
+            }
+        }
+    }
+}
+
 private fun collectStyledText(
     node: HtmlNode,
     baseStyle: TextStyle,
     linkStyle: SpanStyle,
-    builder: AnnotatedString.Builder
+    builder: AnnotatedString.Builder,
+    stickers: MutableSet<String>? = null,
+    emoji: Map<String, String> = zhihuEmojiTable,
 ) {
     when (node) {
-        is HtmlNode.TextNode -> builder.append(node.content)
+        is HtmlNode.TextNode -> appendTextWithStickers(node.content, builder, stickers, emoji)
         is HtmlNode.Element -> {
             when (node.tagName.lowercase()) {
                 "b", "strong" -> builder.withStyle(SpanStyle(fontWeight = FontWeight.Bold)) {
-                    node.children.forEach { collectStyledText(it, baseStyle, linkStyle, this) }
+                    node.children.forEach { collectStyledText(it, baseStyle, linkStyle, this, stickers, emoji) }
                 }
                 "i", "em" -> builder.withStyle(SpanStyle(fontStyle = FontStyle.Italic)) {
-                    node.children.forEach { collectStyledText(it, baseStyle, linkStyle, this) }
+                    node.children.forEach { collectStyledText(it, baseStyle, linkStyle, this, stickers, emoji) }
                 }
                 "u" -> builder.withStyle(SpanStyle(textDecoration = TextDecoration.Underline)) {
-                    node.children.forEach { collectStyledText(it, baseStyle, linkStyle, this) }
+                    node.children.forEach { collectStyledText(it, baseStyle, linkStyle, this, stickers, emoji) }
                 }
                 "s" -> builder.withStyle(SpanStyle(textDecoration = TextDecoration.LineThrough)) {
-                    node.children.forEach { collectStyledText(it, baseStyle, linkStyle, this) }
+                    node.children.forEach { collectStyledText(it, baseStyle, linkStyle, this, stickers, emoji) }
+                }
+                // The article endpoint inlines emoji as an image; draw it where it sits.
+                "img" -> {
+                    val src = node.attributes["src"].orEmpty()
+                    val isSticker = node.attributes["class"].orEmpty().contains("sticker")
+                    if (isSticker && src.isNotEmpty() && stickers != null) {
+                        builder.appendInlineContent(src, node.attributes["alt"].orEmpty())
+                        stickers += src
+                    }
                 }
                 "br" -> builder.append('\n')
                 // A citation marker: `[1]`, raised, linking to the source it cites.
@@ -797,12 +971,12 @@ private fun collectStyledText(
                     if (!url.isNullOrBlank()) {
                         builder.pushStringAnnotation(tag = LINK_ANNOTATION_TAG, annotation = url)
                         builder.withStyle(linkStyle.merge(raised)) {
-                            node.children.forEach { collectStyledText(it, baseStyle, linkStyle, this) }
+                            node.children.forEach { collectStyledText(it, baseStyle, linkStyle, this, stickers, emoji) }
                         }
                         builder.pop()
                     } else {
                         builder.withStyle(raised) {
-                            node.children.forEach { collectStyledText(it, baseStyle, linkStyle, this) }
+                            node.children.forEach { collectStyledText(it, baseStyle, linkStyle, this, stickers, emoji) }
                         }
                     }
                 }
@@ -810,11 +984,11 @@ private fun collectStyledText(
                     val href = node.attributes["href"] ?: ""
                     builder.pushStringAnnotation(tag = LINK_ANNOTATION_TAG, annotation = href)
                     builder.withStyle(linkStyle) {
-                        node.children.forEach { collectStyledText(it, baseStyle, linkStyle, this) }
+                        node.children.forEach { collectStyledText(it, baseStyle, linkStyle, this, stickers, emoji) }
                     }
                     builder.pop()
                 }
-                else -> node.children.forEach { collectStyledText(it, baseStyle, linkStyle, builder) }
+                else -> node.children.forEach { collectStyledText(it, baseStyle, linkStyle, builder, stickers, emoji) }
             }
         }
     }

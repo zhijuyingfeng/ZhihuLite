@@ -28,6 +28,8 @@ import org.nigao.zhihuLite.business_ui.AnswerWiring
 import org.nigao.zhihuLite.business_ui.ContainerHolder
 import org.nigao.zhihuLite.business_ui.FeedWiring
 import org.nigao.zhihuLite.business_logic.login.data.CredentialStore
+import io.github.aakira.napier.Napier
+import coil3.SingletonImageLoader
 
 /**
  * The single place that knows how to build the app's long-lived dependencies.
@@ -93,6 +95,25 @@ class AppContainer(private val application: Application) : FeedWiring, AnswerWir
     }
 
     /**
+     * The image files the previous process cached, dropped for the same reason the feed is: a cold
+     * start is a fresh session, and nothing the last one downloaded should outlive it.
+     *
+     * Images are otherwise cached on disk by Coil (2% of the free space, capped at 250MB, evicted
+     * least-recently-used), which is what makes scrolling back over a long answer instant — and emoji
+     * work offline. Clearing at process start keeps that within a session without letting it grow
+     * across them.
+     */
+    private val coldStartImageResetJob = lazy<Job> {
+        appScope.launch {
+            runCatching { SingletonImageLoader.get(application).diskCache?.clear() }
+                .onFailure { Napier.w("Could not clear the image disk cache", it) }
+        }
+    }
+
+    /** Discards the images the previous process cached. See [coldStartImageResetJob]. */
+    fun discardPreviousSessionImages(): Job = coldStartImageResetJob.value
+
+    /**
      * Discards the feeds the **previous process** stored, and returns the job doing it.
      *
      * Called from `DefaultApplication.onCreate`, so a cold start is a fresh start even when this
@@ -111,6 +132,9 @@ class AppContainer(private val application: Application) : FeedWiring, AnswerWir
      * ask for the wipe? Nothing else in a test can tell whether the startup wiring exists.
      */
     internal fun coldStartResetStarted(): Boolean = coldStartResetJob.isInitialized()
+
+    /** Test seam: did `DefaultApplication.onCreate` ask for the image wipe as well? */
+    internal fun coldStartImageResetStarted(): Boolean = coldStartImageResetJob.isInitialized()
 
     private fun recommendFeedRepository(): FeedRepository = RoomFeedRepository(
         query = FeedQuery(id = RoomFeedRepository.RECOMMEND_QUERY_ID, initialUrl = RECOMMEND_URL),
