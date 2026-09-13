@@ -178,12 +178,33 @@ class AnswerFeedViewModel(
         }
     }
 
+    /**
+     * Reports the answer as displayed. Called for every card that becomes visible.
+     *
+     * This is the exposure half only. It used to send the read report (and the reading-history
+     * write) as well, which made "the card scrolled onto the screen" and "the reader opened the
+     * answer" the same event — see [reportCardRead] for the other half.
+     */
     fun reportCardShow(index: Int) {
         val feedItem = currentItems.getOrNull(index) ?: return
         viewModelScope.launch {
-            // EventReporter de-duplicates by (itemId, kind), so repeated visibility events do not
-            // re-send the same show/read POSTs.
+            // De-duplication lives in `sharedEventReporter`, so repeated visibility events do not
+            // re-send the same request for one card.
             sharedEventReporter.reportShow(feedItem)
+        }
+    }
+
+    /**
+     * Reports the answer as read. Called from the actions inside an answer card.
+     *
+     * There is no separate answer page to open: the question feed *is* the reading surface, so the
+     * action inside a card is what proves the reader engaged with that specific answer — currently
+     * opening its comments or sharing it. A card that was only scrolled past is not reported, which
+     * is the difference from the display report above.
+     */
+    fun reportCardRead(index: Int) {
+        val feedItem = currentItems.getOrNull(index) ?: return
+        viewModelScope.launch {
             sharedEventReporter.reportRead(feedItem)
         }
     }

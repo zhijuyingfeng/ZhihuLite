@@ -115,6 +115,7 @@ dependencies {
     // One unit-test suite, in the module that can see everything. It drives the real layers (Room,
     // the repositories, the ViewModels), which is why the few test seams it needs are public rather
     // than internal.
+    testImplementation(libs.ktor.client.mock)
     testImplementation(project(":model"))
     testImplementation(project(":base_logic"))
     testImplementation(project(":base_navigation"))

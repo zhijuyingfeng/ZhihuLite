@@ -86,9 +86,9 @@ class FakeFeedRepository(initiallyLoaded: Boolean = false) : FeedRepository {
  * Covers [FeedOperations].
  *
  * The load-bearing assertions are about what it does *not* do: it must not re-fetch a feed that is
- * already stored (that used to discard the reader's position), and it must not report the same item
- * twice (the visibility callback fires on every scroll change, which previously produced repeated
- * show/read POSTs).
+ * already stored (that used to discard the reader's position), and it must not paginate twice at
+ * once. Reporting lives on `EventReporter` — see `EventReporterBatchingTest` and the two
+ * `*ReadReportingTest`s.
  */
 class FeedOperationsTest {
 
@@ -181,34 +181,4 @@ class FeedOperationsTest {
         assertTrue(operations.coldStartDiscardPerformed())
     }
 
-    @Test
-    fun aReporterFailureDoesNotEscape() = runBlocking {
-        // Reporting is best-effort telemetry; a failure there must not surface as a screen error.
-        val repository = FakeFeedRepository()
-        val operations = FeedOperations(repository, reporter = null)
-
-        operations.reportVisible(testFeedItem("answer-1"))
-        operations.reportVisible(testFeedItem("answer-1"))
-    }
-
-    @Test
-    fun anItemWithoutTargetIdIsIgnored() = runBlocking {
-        val operations = FeedOperations(FakeFeedRepository(), reporter = null)
-
-        operations.reportVisible(testFeedItem("x").copy(target = null))
-    }
-
-    @Test
-    fun reportedKeysAreRecordedOncePerItemAndKind() = runBlocking {
-        val operations = FeedOperations(FakeFeedRepository(), reporter = null)
-
-        operations.reportVisible(testFeedItem("answer-1"))
-        operations.reportVisible(testFeedItem("answer-1"))
-        operations.reportVisible(testFeedItem("answer-2"))
-
-        // One "show" and one "read" per item, and re-reporting the same item adds nothing.
-        assertEquals(4, operations.reportedKeyCount())
-        assertTrue(operations.hasReported("show", "answer-1"))
-        assertTrue(operations.hasReported("read", "answer-2"))
-    }
 }

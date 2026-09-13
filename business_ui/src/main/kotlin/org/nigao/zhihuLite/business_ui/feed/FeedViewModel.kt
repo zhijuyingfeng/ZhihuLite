@@ -17,6 +17,7 @@ import org.nigao.zhihuLite.base_navigation.FullScreenVideoRoute
 import org.nigao.zhihuLite.base_navigation.ImageViewerRoute
 import org.nigao.zhihuLite.base_navigation.QuestionDetailRoute
 import org.nigao.zhihuLite.model.feed.FeedItem
+import org.nigao.zhihuLite.business_logic.feed.sharedEventReporter
 
 /**
  * Recommendation feed state, backed by Room.
@@ -138,10 +139,18 @@ class FeedViewModel(
     fun reportCardShow(index: Int) {
         val feedItem = currentItems.getOrNull(index) ?: return
         viewModelScope.launch {
-            // De-duplication lives in `FeedOperations`, which is why reporting goes through it
-            // rather than straight to a reporter: the visibility callback fires on every scroll
-            // change, so the same card would otherwise be reported repeatedly.
-            operations.reportVisible(feedItem)
+            // Straight to the reporter, which is process-wide and de-duplicates by (kind, item): the
+            // visibility callback fires on every scroll change. Same shape as the question page's
+            // view model, so there is one way to report rather than two.
+            sharedEventReporter.reportShow(feedItem)
+        }
+    }
+
+    /** Reports the card as opened; called when the reader taps it, before the route is pushed. */
+    fun reportCardRead(index: Int) {
+        val feedItem = currentItems.getOrNull(index) ?: return
+        viewModelScope.launch {
+            sharedEventReporter.reportRead(feedItem)
         }
     }
 

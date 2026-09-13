@@ -28,6 +28,7 @@ import org.nigao.zhihuLite.business_ui.answer.HtmlToComposeUi
 @Composable
 fun AnswerCard(
     uiState: AnswerCardUiState,
+    onInteract: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val viewModel: AnswerCardViewModel = viewModel(
@@ -72,7 +73,7 @@ fun AnswerCard(
                 color = Color.Gray,
             )
         }
-        ActionBar(uiState.actionBarUiState)
+        ActionBar(uiState.actionBarUiState, onInteract = onInteract)
         HorizontalDivider(
             thickness = 1.dp,
             color = Color.LightGray,

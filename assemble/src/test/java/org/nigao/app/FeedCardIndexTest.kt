@@ -66,7 +66,7 @@ class FeedCardIndexTest {
     @Test
     fun `a feed-level entry in the middle does not shift which answer a card opens`() = runBlocking {
         val repository = FakeFeedRepository()
-        val viewModel = FeedViewModel(FeedOperations(repository, reporter = null))
+        val viewModel = FeedViewModel(FeedOperations(repository))
         repository.emit(listOf(answerItem("answer-1", "q-1"), feedLevelEntry, answerItem("answer-3", "q-3")))
         withTimeoutOrNull(5_000) {
             while ((viewModel.uiState.value as? FeedUiState.Success)?.cardStates?.size != 2) delay(20)

@@ -126,6 +126,9 @@ fun AnswerFeedScreen(
                     ) { index ->
                         AnswerCard(
                             uiState = successState.cardStates[index],
+                            // The card owns the actions, so it is also what knows the reader engaged
+                            // with this answer; the ViewModel turns that into the read report.
+                            onInteract = { viewModel.reportCardRead(index) },
                             modifier = Modifier.padding(horizontal = 16.dp)
                         )
                         Spacer(modifier = Modifier.height(8.dp))

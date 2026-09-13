@@ -72,7 +72,7 @@ class FeedVideoRoutingTest {
     @Test
     fun `a video cover opens the full-screen player and a photo cover keeps the image viewer`() = runBlocking {
         val repository = FakeFeedRepository()
-        val viewModel = FeedViewModel(FeedOperations(repository, reporter = null))
+        val viewModel = FeedViewModel(FeedOperations(repository))
         repository.emit(listOf(videoCard, photoCard))
         // The list arrives through the repository's flow.
         withTimeoutOrNull(5_000) {

@@ -8,7 +8,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
-import org.nigao.zhihuLite.business_logic.feed.EventReporter
 import org.nigao.zhihuLite.business_logic.feed.FeedOperations
 import org.nigao.zhihuLite.business_logic.feed.data.AnswerApi
 import org.nigao.zhihuLite.business_logic.feed.data.FeedQuery
@@ -75,10 +74,7 @@ class AppContainer(private val application: Application) : FeedWiring, AnswerWir
      * state — the two things that stop duplicate page requests and repeated report POSTs.
      */
     override val operations: FeedOperations by lazy {
-        FeedOperations(
-            repository = recommendFeedRepository(),
-            reporter = EventReporter(sharedHttpClient),
-        )
+        FeedOperations(repository = recommendFeedRepository())
     }
 
     /**

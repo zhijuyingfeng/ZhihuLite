@@ -1,6 +1,11 @@
 package org.nigao.zhihuLite.business_logic.feed
 
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import io.ktor.client.HttpClient
 import io.ktor.client.request.HttpRequestBuilder
 import io.ktor.client.request.forms.MultiPartFormDataContent
@@ -16,6 +21,7 @@ import org.nigao.zhihuLite.business_logic.login.LogInManager
 import org.nigao.zhihuLite.model.feed.FeedItem
 import org.nigao.zhihuLite.business_logic.zhihu.sharedHttpClient
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Reports what the reader has seen, the way the web client does.
@@ -29,7 +35,9 @@ import java.util.concurrent.ConcurrentHashMap
  * device, this request answers `201 {"success":true}` without one.
  */
 class EventReporter(
-    private val httpClient: HttpClient
+    private val httpClient: HttpClient,
+    /** Overridable so a test can keep the tick out of its way. */
+    private val showBatchIntervalMs: Long = SHOW_BATCH_INTERVAL_MS,
 ) {
     /**
      * "kind:itemId" pairs already reported. Exposure callbacks fire on every
@@ -39,26 +47,92 @@ class EventReporter(
      */
     private val reportedKeys: MutableSet<String> = ConcurrentHashMap.newKeySet()
 
+    /**
+     * Displays waiting for the next tick.
+     *
+     * A reader scrolls past many cards at once, and `/lastread/touch` takes an array precisely so that
+     * is one request rather than one per card. Queued on the visibility callback, drained every
+     * [SHOW_BATCH_INTERVAL_MS] by [flushShows].
+     */
+    private val pendingShows: MutableSet<String> = ConcurrentHashMap.newKeySet()
+
+    private val showTickerRunning = AtomicBoolean(false)
+
+    /** The ticker's own scope: it outlives any screen, which is the point of batching. */
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
     suspend fun reportShow(feedItem: FeedItem) {
         val answerId = feedItem.target?.id ?: return
-        if (!markReported(answerId, KIND_SHOW)) return
-        reportTouch(answerId, KIND_TOUCH)
+        if (!markReported(answerId, SHOW)) return
+        pendingShows += answerId
+        startShowTicker()
     }
+
+    /**
+     * Starts the 10s tick on first use and leaves it running.
+     *
+     * It is deliberately not stopped when the queue drains: the empty check is free, and a ticker that
+     * shuts itself down can lose an item enqueued in the instant between "nothing to send" and
+     * "stopped" — a lost report is worse than an idle wakeup while the app is alive.
+     */
+    private fun startShowTicker() {
+        if (!showTickerRunning.compareAndSet(false, true)) return
+        scope.launch {
+            while (true) {
+                delay(showBatchIntervalMs)
+                flushShows()
+            }
+        }
+    }
+
+    /**
+     * Sends what is queued and empties it, in chunks of [SHOW_BATCH_SIZE].
+     *
+     * Returns how many were sent, so a caller can tell "nothing to do" from "sent". Items enqueued
+     * while a chunk is in flight stay for the next call.
+     */
+    suspend fun flushShows(): Int {
+        var sent = 0
+        while (true) {
+            val batch = drainShows(SHOW_BATCH_SIZE)
+            if (batch.isEmpty()) return sent
+            postTouch(answerIds = batch, kind = KIND_TOUCH, what = "lastread/touch touch")
+            sent += batch.size
+            Napier.d("reported ${batch.size} displayed item(s) in one request")
+        }
+    }
+
+    /** Takes up to [limit] queued ids, leaving the rest behind. */
+    fun drainShows(limit: Int): List<String> {
+        val batch = ArrayList<String>(limit)
+        val iterator = pendingShows.iterator()
+        while (iterator.hasNext() && batch.size < limit) {
+            batch += iterator.next()
+            iterator.remove()
+        }
+        return batch
+    }
+
+    /** Test seam for the queue's contents. */
+    fun pendingShowCount(): Int = pendingShows.size
 
     suspend fun reportRead(feedItem: FeedItem) {
         val answerId = feedItem.target?.id ?: return
-        if (!markReported(answerId, KIND_READ)) return
-        reportTouch(answerId, KIND_READ)
+        if (!markReported(answerId, READ)) return
+        // The queue goes first, so the server hears "was on screen" before "was read" for the same
+        // item rather than a tick later.
+        flushShows()
+        postTouch(answerIds = listOf(answerId), kind = READ, what = "lastread/touch read")
         reportReadHistory(answerId)
     }
 
     /** `touch` means "was on screen"; `read` means "was opened". */
-    private suspend fun reportTouch(answerId: String, kind: String) {
-        val items = """[["answer","$answerId","$kind"]]"""
+    private suspend fun postTouch(answerIds: List<String>, kind: String, what: String) {
+        val items = touchItemsBody(answerIds, kind)
         post(
             url = "$HOST/lastread/touch",
-            answerId = answerId,
-            what = "lastread/touch $kind",
+            answerId = answerIds.joinToString(","),
+            what = what,
         ) {
             setBody(
                 MultiPartFormDataContent(
@@ -118,13 +192,26 @@ class EventReporter(
     private fun markReported(answerId: String, kind: String): Boolean =
         reportedKeys.add("$kind:$answerId")
 
+    /**
+     * Test seam, public for the same reason [FeedOperations.hasReported] is: the suite lives in the
+     * application module and the de-duplication record is the behaviour under test.
+     */
+    fun hasReported(kind: String, answerId: String): Boolean = "$kind:$answerId" in reportedKeys
+
     companion object {
         private const val HOST = "https://www.zhihu.com"
-        private const val KIND_SHOW = "show"
-        private const val KIND_READ = "read"
+        /** The two report kinds; they key the de-duplication record and are asserted by the tests. */
+        const val SHOW = "show"
+        const val READ = "read"
 
         /** The wire value for "this was on screen". */
         private const val KIND_TOUCH = "touch"
+
+        /** How often queued displays are sent. */
+        const val SHOW_BATCH_INTERVAL_MS = 10_000L
+
+        /** Items per request. The endpoint takes an array, but not an unbounded one. */
+        const val SHOW_BATCH_SIZE = 20
 
         /**
          * No `Content-Type` here: `MultiPartFormDataContent` supplies its own, boundary included, and
@@ -146,5 +233,14 @@ class EventReporter(
         }
     }
 }
+
+/**
+ * The `items` field `/lastread/touch` expects: one `[type, id, kind]` triple per item.
+ *
+ * Pure so the batch's shape can be asserted without a network: the endpoint takes an array, and the
+ * whole point of queueing is to put more than one triple in it.
+ */
+fun touchItemsBody(answerIds: List<String>, kind: String): String =
+    answerIds.joinToString(prefix = "[", postfix = "]", separator = ",") { """["answer","$it","$kind"]""" }
 
 val sharedEventReporter = EventReporter(sharedHttpClient)

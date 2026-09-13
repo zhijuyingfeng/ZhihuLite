@@ -37,9 +37,18 @@ import org.nigao.zhihuLite.business_ui.comment.CommentView
 import org.nigao.zhihuLite.business_ui.shared.CommonPanel
 import org.nigao.zhihuLite.business_logic.share.shareAnswer
 
+/**
+ * The actions under an answer.
+ *
+ * [onInteract] is called for the actions that mean the reader engaged with *this* answer — opening
+ * its comments, or sharing it. A mere display does not call it, and neither do the vote buttons:
+ * they are still inert placeholders, and an action that does nothing is not evidence that the
+ * answer was read.
+ */
 @Composable
 fun ActionBar(
     uiState: ActionBarUiState,
+    onInteract: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val buttonHeight = 36.dp
@@ -96,7 +105,10 @@ fun ActionBar(
         Row (
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.height(buttonHeight)
-                .noRippleClickable{ isCommentShowing = true }
+                .noRippleClickable {
+                    onInteract()
+                    isCommentShowing = true
+                }
         ) {
             Icon(
                 imageVector = Icons.Outlined.ModeComment,
@@ -117,6 +129,7 @@ fun ActionBar(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.height(buttonHeight)
                 .noRippleClickable {
+                    onInteract()
                     uiState.answerId?.let { answerId ->
                         coroutineScope.launch {
                             shareAnswer(answerId = answerId, context = context)

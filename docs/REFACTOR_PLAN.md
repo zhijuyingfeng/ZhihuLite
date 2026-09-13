@@ -3024,6 +3024,8 @@ Column(Modifier.padding(vertical = 8.dp)) { … } // ← 外层 Column 又一个
 
 触发点：`AnswerFeedViewModel.reportCardShow`（卡片可见 → show + read）+ `FeedOperations`（首次 read）；`reportedKeys` 去重（每 item 每 kind 每进程一次 ✓）。
 
+> 这两行触发点已在**第二十次修订**中拆开：可见性只报 `show`，`read` 改由用户动作触发（主 feed 点开卡片、回答卡片里打开评论/分享）。下面"语义混淆"那一行也随之失效。
+
 **与浏览器 curl 的差异（实测过的）**
 
 | 项 | 结论 |
@@ -3042,6 +3044,58 @@ Column(Modifier.padding(vertical = 8.dp)) { … } // ← 外层 Column 又一个
 3. **明确不把遥测接到 `ZhihuApi.request` 上** ✓（并在类注释里写清原因 ✓）：那个方法在 401/403 时会 **invalidate 登录态** ✗，等于把"上报失败"升级成"被登出" ✗；直连 + 只记日志更稳 ✓。
 
 **验证**：221 测试 0 失败 ✓；真机日志确认上报仍在发 ✓、`read_history/add answered 200 with 'null'` ✓、**没有任何 warning** ✓。
+
+### 7.54 展现上报改成"入队 + 每 10 秒批量发一次"
+
+**先回答**：原来是**不批量**的 ✗ —— 每张卡片一个 POST，body 是 `items=[["answer","<id>","touch"]]`（数组里只有一项）。
+
+**先验证服务端吃不吃批量**（不然改法就是错的）：
+
+| body | 结果 |
+|---|---|
+| 1 条 | `201 {"success":true}` ✓ |
+| 3 条 | `201 {"success":true}` ✓ |
+| 10 条 | `201 {"success":true}` ✓ |
+
+顺带发现：**缺了 `commonHeadersBuilder` 那套头（UA/Referer/Origin/x-requested-with）会 403** ✗ —— 这套头是必需的 ✓（我第一版探针只带 Cookie，三条全 403 ✓）。
+
+**改动（按用户要求）**
+
+1. `reportShow`（可见性回调）**只入队** ✓（`pendingShows`，`ConcurrentHashMap` keySet ✓），不再直接发请求 ✓。
+2. 一个 **10 秒 ticker**：队列非空就发一次，发完清空 ✓；超过 **20 条** 自动分块 ✓（`items` 是数组，但不是无上限的 ✓）。
+3. `reportRead` 仍然**立即**发 ✓，但**先 flush 队列** ✓ —— 让服务端先听到"出现过"再听到"读过" ✓。
+4. **只留一个 reporter** ✓：原来 `AppContainer` 又 `EventReporter(sharedHttpClient)` 造了一个 ✗（于是有两份去重记录、两个队列 ✗），改成直接用 `sharedEventReporter` ✓。
+5. ticker **惰性启动**、且**不自动停** ✓（原因写在注释里：一次"空检查"几乎没有成本，而"自己停掉"会有"刚判空就入队 → 永远不发"的丢失风险 ✓ 丢一次上报比空闲唤醒严重 ✓）。间隔可注入 ✓（测试用 ✓）。
+6. 上报成功后按 debug 记一行（`reported N displayed item(s) in one request` ✓），批量才可观测 ✓。
+
+**测试**（`EventReporterBatchingTest`，6 例 ✓，用 Ktor `MockEngine` 断言真实请求）
+`items` 三元组形状 ✓；入队不发 ✓、重复入队不增 ✓；`drainShows` 限量并留余 ✓；一次批量一个请求 ✓；**25 条 → 20+5 两个请求** ✓；`reportRead` 的顺序是 `touch(队列) → touch(read) → read_history` ✓。
+**总数 233 例 0 失败** ✓；三变体构建成功 ✓。
+
+**真机验证**：冷启动后 18 秒内日志出现 **`reported 5 displayed item(s) in one request`** ✓✓ —— 首屏 5 张卡片合成**一个** POST（改前是 5 个 ✓），且**没有任何 warning** ✓（批量被接受 ✓）。
+
+### 7.55 上报逻辑搬出 `FeedOperations`：一条路径，一个去重记录
+
+用户质疑："`FeedOperations` 中还包含了展现上报逻辑，不太对吧，这应该是 ViewModel 的职责？" —— **对** ✓，而且代码里有三处可以举证：
+
+| 问题 | 事实 |
+|---|---|
+| 去重写了两份 | `FeedOperations.reported`（带锁 ✓）**和** `EventReporter.reportedKeys` ✓ —— 同一个"每 item 每 kind 一次"在两个地方各存一份 ✗ |
+| 失败处理写了两份 | `FeedOperations` 里 try/catch + `Napier.w` ✓，而 `EventReporter.post()` 内部本来就吞掉异常并记录 ✓ |
+| 两条 feed 走法不一致 | 问题页 VM 直接调 `sharedEventReporter` ✓；首页 VM 绕 `FeedOperations` ✓ —— 连新增的测试都体现了这点（`AnswerFeedReadReportingTest` 断言 reporter ✓，`FeedReadReportingTest` 断言 `FeedOperations.hasReported` ✗） |
+
+`FeedOperations.reportShown/reportRead` 实际只做"取 id → 查重 → 透传" ✓，而"哪张卡可见/被点了"本来就由 VM 判定 ✓ —— 所以它既没做业务判断 ✗，又和 reporter 重复 ✗。
+
+**改法（用户确认"按推荐改"）**
+
+1. `FeedOperations`：删掉 `reporter` 参数、`reported`、`reportShown`、`reportRead`、`markReported`、`reportedKeyCount`、`hasReported`、`SHOW`/`READ` 常量 ✓。它的类注释也相应改写 ✓：进程级状态的理由仍在 ✓（`paginationMutex` 必须全进程一个 ✓），并写明"上报不在这里，因为可见性是屏幕的事、去重与批处理是进程级 `EventReporter` 的事" ✓。
+2. `FeedViewModel.reportCardShow/reportCardRead` → 直接 `sharedEventReporter.reportShow/reportRead` ✓，**与 `AnswerFeedViewModel` 完全对称** ✓。
+3. `SHOW`/`READ` 常量搬到 `EventReporter` ✓（测试用 ✓）。
+4. `AppContainer` 不再给 `FeedOperations` 注入 reporter ✓。
+
+**测试迁移**：`FeedOperationsTest` 里 5 条上报用例删除 ✓（覆盖没丢：去重/无 target → `EventReporterBatchingTest` ✓（顺手补了"无 target 不入队"一条 ✓）；展现≠已读、已读只报一次 → 两个 `*ReadReportingTest` ✓）；`FeedReadReportingTest` 改为断言 `sharedEventReporter.hasReported(...)` ✓，并**换上自己的 answer id** ✓ —— 去重记录是进程级的 ✓，多个测试共用 id 会互相干扰 ✓（`AnswerFeedReadReportingTest` 本来就标注了这条规则 ✓）。
+
+**验证**：**229 例 0 失败** ✓（233 − 5 + 1 ✓）；真机复测：新路径下首屏仍发出 `reported 3 displayed item(s) in one request` ✓，`EventReporter` 告警 **0** ✓。
 
 ## 8. 风险与对策
 
@@ -3112,6 +3166,21 @@ Column(Modifier.padding(vertical = 8.dp)) { … } // ← 外层 Column 又一个
 1. **"屏幕上出现了什么"不足以推断"数据里有什么"。** 调试/兜底渲染会凭空造出屏幕上本来不存在的东西；判断前先找**谁画的**（这里就是渲染器里的兜底分支）。
 2. **只在 debug 生效的渲染，要么别进生产路径，要么明确标出来**（例如 `UnknownElement` 的提示加上"unhandled tag"字样）。否则它既是排查线索，也是误判来源。
 3. **未适配的标签要按"标签语义"补**：`br` 在解析器里已经是 void 标签（所以不会吞文本），缺的只是渲染器里的换行——**解析与渲染是两件事，修一处不代表另一处也对。**
+
+**第二十次修订：展现与已读是两个事件，不能共用一个触发点。** §7.53 记下过"语义混淆"：`reportShow` 与 `reportRead` 无差别地一起触发。对照 Zhihu++ 的实现看，它的两端是分开的——`lastread/touch` 的 `touch` 由 feed 在展示时批量上报，`read` 与 `read_history/add` 由**用户真正打开内容**时上报。于是把 ZhihuLite 的触发点也拆开：
+
+| | 触发点 | 上报 |
+|---|---|---|
+| 展现 | 卡片进入可视区（主 feed 与问题页都是这一处） | `lastread/touch` 的 `touch` |
+| 已读 | 主 feed 点开卡片 / 回答卡片里的**真实动作**（打开评论、分享） | `lastread/touch` 的 `read` + `read_history/add` |
+
+三条结论：
+
+1. **"出现在屏幕上"和"读了"需要不同强度的证据。** 曝光可以只看可见性（它描述的就是可见性），而"已读"必须由一个**用户的动作**触发。原实现让可见性同时充当两者，代价是划过即写历史——`read_history` 是别人能看到的公开档案，误报比漏报更值得避免。
+2. **合并的触发点会把两个语义一起锁死。** 拆分不是把一次调用改两处，而是让两种"事实"各自有唯一的产生点：展现来自列表的可见性观察，已读来自卡片自身的动作回调（`AnswerCard.onInteract`）。这也是 §10 第四次修订"方法即操作"的延伸——`reportShown` 与 `reportRead` 各自去重、各自可断言。
+3. **占位的动作不能当作证据。** 回答卡片上的投票按钮目前是空实现（`noRippleClickable {}`），所以没有接上报：一个什么都没做的动作不能证明读者读过这条回答。等它真的接上接口时再加，而不是先按"看起来是个动作"接上。
+
+代价是明确的：问题页里读完但不点任何动作的回答不会再进在线历史。这是这次改动**故意**选的边界——把"没读"误报成"读过"会被所有人看到，反向的漏报只是少一条历史。
 
 ## 9. 附：与专项审查报告的对应关系
 

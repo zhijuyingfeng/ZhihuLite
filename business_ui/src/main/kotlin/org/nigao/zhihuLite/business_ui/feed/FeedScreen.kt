@@ -135,17 +135,19 @@ fun SuccessFeedScreen(
                 contentType = { "feed_card" },
             ) { index ->
                 val cardState = uiState.cardStates[index]
-                val navigateRoute: (ClickPosition) -> Unit = { position ->
+                // Reporting the read here — not from the visibility callback — is what keeps a card
+                // that was merely scrolled past out of the reading history. `onClick` and the outer
+                // `clickable` are mutually exclusive for one tap, so this runs exactly once for it.
+                val openCard: (ClickPosition) -> Unit = { position ->
+                    viewModel.reportCardRead(index)
                     // No suspension needed: the item list is already in memory.
                     viewModel.destinationFor(index, position)?.let(onNavigate)
                 }
                 FeedItemCard(
                     uiState = cardState,
-                    onClick = { position ->
-                        navigateRoute.invoke(position)
-                    },
+                    onClick = openCard,
                     modifier = Modifier.noRippleClickable {
-                        navigateRoute.invoke(ClickPosition.Card)
+                        openCard(ClickPosition.Card)
                     }
                 )
             }

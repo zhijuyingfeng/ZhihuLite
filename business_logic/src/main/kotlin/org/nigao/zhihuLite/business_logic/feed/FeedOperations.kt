@@ -10,26 +10,26 @@ import org.nigao.zhihuLite.business_logic.feed.data.LoadMoreOutcome
 import org.nigao.zhihuLite.model.feed.FeedItem
 
 /**
- * The feed operations a screen can ask for: observe, refresh, load more, report visibility.
+ * The feed operations a screen can ask for: observe, refresh, load more.
  *
  * Why this exists as its own type rather than three `*UseCase` classes (the earlier design): the
  * rules below are one cohesive contract, and the ceremony of one class per operation bought nothing
  * (docs/REFACTOR_PLAN.md §10, fourth revision).
  *
- * **Its state is the point.** [reported] and [paginationMutex] must live for the whole process, so
- * the container hands out a single instance — constructing one per screen would silently disable
- * report de-duplication (reproducing the "three POSTs per card" bug) and make the pagination mutex
- * useless, since it would be a different mutex per screen.
+ * **Its state is the point.** [paginationMutex] must live for the whole process, so the container
+ * hands out a single instance — one per screen would make the mutex useless, since it would be a
+ * different mutex per screen.
+ *
+ * Reporting is deliberately *not* here: when a card became visible is the screen's business, and the
+ * de-duplication and batching belong to `EventReporter`, which is process-wide for exactly that
+ * reason. Having it in both places meant two de-duplication records and two copies of the
+ * best-effort failure handling.
  *
  * Depends only on `business_logic` types, so it stays JVM-testable with a fake repository.
  */
 class FeedOperations(
     private val repository: FeedRepository,
-    private val reporter: EventReporter? = null,
 ) {
-    /** Keyed by "kind:itemId"; see the class note about why this must not be per-screen. */
-    private val reported = mutableSetOf<String>()
-
     /**
      * Serializes paging. The repository protects its own cursor, but two screens (or a refresh racing
      * a load-more) can still ask for the same next page concurrently; this is the single gate.
@@ -84,41 +84,8 @@ class FeedOperations(
 
     suspend fun refresh(): LoadMoreOutcome = inPagination { repository.refresh() }
 
-    /**
-     * Reports a newly visible item once.
-     *
-     * De-duplicated because the visibility callback fires on every scroll change: without this, a
-     * card re-entering the viewport re-sent its show/read requests.
-     */
-    suspend fun reportVisible(item: FeedItem) {
-        val answerId = item.target?.id ?: return
-        val showKey = "show:$answerId"
-        val readKey = "read:$answerId"
-        val firstShow = synchronized(reported) { reported.add(showKey) }
-        val firstRead = synchronized(reported) { reported.add(readKey) }
-        if (!firstShow && !firstRead) return
-
-        try {
-            if (firstShow) reporter?.reportShow(item)
-            if (firstRead) reporter?.reportRead(item)
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            // A failed report must not fail the screen; it is best-effort telemetry.
-            Napier.w("Reporting visibility failed for $answerId: ${e.message}")
-        }
-    }
-
     private suspend fun inPagination(block: suspend () -> LoadMoreOutcome): LoadMoreOutcome =
         paginationMutex.withLock { block() }
-
-    /**
-     * Test seams. Public because the suite lives in the application module: the de-duplication
-     * record and the cold-start flag are the behaviour under test, so they must be observable.
-     */
-    fun reportedKeyCount(): Int = synchronized(reported) { reported.size }
-    fun hasReported(kind: String, answerId: String): Boolean =
-        synchronized(reported) { "$kind:$answerId" in reported }
 
     /** Test seam for the cold-start flag; see [discardStoredFeedOnColdStart]. */
     fun coldStartDiscardPerformed(): Boolean = coldStartDiscardDone
