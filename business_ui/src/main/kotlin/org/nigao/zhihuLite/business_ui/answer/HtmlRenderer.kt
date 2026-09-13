@@ -578,8 +578,10 @@ private fun ImageElement(
 
     Column(Modifier.padding(top = 4.dp)) {
         if (imageLoader != null && src.isNotEmpty()) {
-            // Route through the injected loader so the parsed width/height become the decode target;
-            // a raw AsyncImage here decodes at full resolution and jumps when it resolves.
+            // Through the loader so the payload's declared size becomes the decode target: decoding
+            // a 1440px bitmap to draw a few hundred pixels is what costs the memory. (The picture
+            // still jumps when the bitmap lands only when the payload declared no size at all, which
+            // leaves nothing to reserve the space with.)
             imageLoader.LoadImage(
                 src = src,
                 contentDescription = altText.ifBlank { null },

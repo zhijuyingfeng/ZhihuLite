@@ -148,18 +148,18 @@ class FeedOperationsTest {
     }
 
     @Test
-    fun coldStartDiscardRunsOncePerProcess() = runBlocking {
+    fun discardingTheStoredFeedHappensOnce() = runBlocking {
         val repository = FakeFeedRepository(initiallyLoaded = true)
         val operations = FeedOperations(repository)
 
-        operations.discardStoredFeedOnColdStart()
-        operations.discardStoredFeedOnColdStart()
-        operations.discardStoredFeedOnColdStart()
+        operations.discardStoredFeed()
+        operations.discardStoredFeed()
+        operations.discardStoredFeed()
 
         // Once per process, not per screen: rotating or coming back from the question detail must not
         // throw the freshly loaded list away again.
         assertEquals(1, repository.discardCount)
-        assertTrue(operations.coldStartDiscardPerformed())
+        assertTrue(operations.discardPerformed())
     }
 
     @Test
@@ -167,18 +167,18 @@ class FeedOperationsTest {
         val repository = FakeFeedRepository(initiallyLoaded = true).apply { failDiscard = true }
         val operations = FeedOperations(repository)
 
-        operations.discardStoredFeedOnColdStart()
+        operations.discardStoredFeed()
 
         // Stale content is a much smaller problem than a feed that cannot load, so the failure is
         // swallowed — but the flag must stay unset so the next attempt tries again.
         assertEquals(1, repository.discardCount)
-        assertTrue(!operations.coldStartDiscardPerformed())
+        assertTrue(!operations.discardPerformed())
 
         repository.failDiscard = false
-        operations.discardStoredFeedOnColdStart()
+        operations.discardStoredFeed()
 
         assertEquals(2, repository.discardCount)
-        assertTrue(operations.coldStartDiscardPerformed())
+        assertTrue(operations.discardPerformed())
     }
 
 }

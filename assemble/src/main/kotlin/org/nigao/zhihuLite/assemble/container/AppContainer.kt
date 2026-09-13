@@ -87,7 +87,7 @@ class AppContainer(private val application: Application) : FeedWiring, AnswerWir
     override val screenTeardownScope: CoroutineScope get() = appScope
 
     private val coldStartResetJob = lazy<Job> {
-        appScope.launch { operations.discardStoredFeedOnColdStart() }
+        appScope.launch { operations.discardStoredFeed() }
     }
 
     /**
@@ -114,7 +114,7 @@ class AppContainer(private val application: Application) : FeedWiring, AnswerWir
      *
      * Called from `DefaultApplication.onCreate`, so a cold start is a fresh start even when this
      * session opens on the sign-in screen instead of the feed. The feed screen still calls
-     * `FeedOperations.discardStoredFeedOnColdStart()` before it subscribes; that call now simply
+     * `FeedOperations.discardStoredFeed()` before it subscribes; that call now simply
      * awaits this job, which is what preserves the ordering "clear -> observe -> load" (and stops
      * the previous list from flashing on screen).
      *

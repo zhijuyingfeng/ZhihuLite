@@ -60,7 +60,7 @@ class FeedViewModel(
             // the stored list (Room replays the current contents), and the old feed would flash on
             // screen before the new one arrived. Clearing first means the first emission is already
             // empty, so the screen stays on its full-screen loading state until page one lands.
-            operations.discardStoredFeedOnColdStart()
+            operations.discardStoredFeed()
             observeFeedItems()
             loadInitialItems()
         }

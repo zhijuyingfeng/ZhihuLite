@@ -36,31 +36,35 @@ class FeedOperations(
      */
     private val paginationMutex = Mutex()
 
-    /** Guards the one-shot cold-start reset below; also the reason it cannot run twice at once. */
-    private val coldStartMutex = Mutex()
-    private var coldStartDiscardDone = false
+    /** Guards the discard below; also the reason it cannot run twice at once. */
+    private val discardMutex = Mutex()
+    private var discardDone = false
 
     fun observe(): Flow<List<FeedItem>> = repository.observe()
 
     /**
-     * Drops everything stored, **once per process**, so a cold start begins from a blank slate.
+     * Discards everything stored. A capability, not a schedule: the caller decides when that is the
+     * right thing to do (the container does it once on a cold start; see
+     * `AppContainer.discardPreviousSessionFeeds`).
      *
-     * Requested behaviour: the previous session's list must not be rendered at launch. Clearing
-     * before the screen subscribes gives that for free — the feed screen then sees an empty store, so
-     * it shows its full-screen loading state and fetches page one again.
+     * Idempotent — the first call clears the store, later ones are no-ops — which is what lets the
+     * container run it and the feed screen await the same result without either knowing about the
+     * other. The record is per *process*, not per screen: rotating, or coming back from the question
+     * detail, must not throw the list away. It lives here because this object is the process-wide
+     * singleton (see the class note).
      *
-     * Once per *process*, not per screen: rotating, or coming back from the question detail, must not
-     * throw the list away. That state belongs here because this object is the process-wide singleton
-     * (see the class note) — a per-screen instance would reset on every rotation.
+     * Clearing before the screen subscribes is the point of the callers: the feed screen then sees an
+     * empty store, shows its loading state and fetches page one again instead of flashing the
+     * previous session's list.
      *
      * A failure is logged and the flag stays unset so a later call retries: showing stale content is
      * a much smaller problem than a feed that cannot load at all.
      */
-    suspend fun discardStoredFeedOnColdStart() = coldStartMutex.withLock {
-        if (coldStartDiscardDone) return@withLock
+    suspend fun discardStoredFeed() = discardMutex.withLock {
+        if (discardDone) return@withLock
         try {
             repository.discardStoredData()
-            coldStartDiscardDone = true
+            discardDone = true
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -87,6 +91,6 @@ class FeedOperations(
     private suspend fun inPagination(block: suspend () -> LoadMoreOutcome): LoadMoreOutcome =
         paginationMutex.withLock { block() }
 
-    /** Test seam for the cold-start flag; see [discardStoredFeedOnColdStart]. */
-    fun coldStartDiscardPerformed(): Boolean = coldStartDiscardDone
+    /** Test seam for the discard record; see [discardStoredFeed]. */
+    fun discardPerformed(): Boolean = discardDone
 }

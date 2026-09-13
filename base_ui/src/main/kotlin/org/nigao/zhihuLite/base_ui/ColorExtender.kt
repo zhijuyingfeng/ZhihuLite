@@ -6,3 +6,8 @@ import androidx.core.graphics.toColorInt
 fun parseColor(hexString: String): ComposeColor {
     return ComposeColor(hexString.toColorInt())
 }
+
+/** A `#RRGGBB` (or `#AARRGGBB`) colour from the payload, as a Compose [ComposeColor]. */
+fun String.toColor(): ComposeColor {
+    return parseColor(this)
+}

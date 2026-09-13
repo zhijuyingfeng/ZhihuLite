@@ -5,9 +5,9 @@ plugins {
     alias(libs.plugins.serialization)
 }
 
-// Cross-layer navigation vocabulary: the route objects and the AppNavigator contract. Depends on
-// nothing of ours so both business_ui (which raises routes) and assemble (which registers the graph)
-// can use it without either depending on the other.
+// Cross-layer navigation vocabulary: the route objects, and nothing else. Depends on nothing of ours
+// so both business_ui (which raises routes) and assemble (which registers the graph) can use it
+// without either depending on the other.
 kotlin {
     compilerOptions { jvmTarget.set(JvmTarget.JVM_11) }
 }

@@ -169,7 +169,7 @@ org.nigao.zhihuLite
 │   ├── result/UiMessage.kt             # 纯数据:资源 id + 参数(见 §3.1 边界陷阱)
 │   ├── logging/AppLogger.kt            # 仅接口;Napier 实现在 assemble
 │   ├── time/TimestampFormatter.kt      # 预构建 DateTimeFormatter 表(纯 java.time)
-│   ├── text/                           # StringExtender · IntFormat
+│   ├── text/                           # IntFormat
 │   ├── coroutines/DispatcherProvider.kt# 只暴露 IO/Default(不得暴露 Main)
 │   └── di/CreationExtras.kt            # wiringKey<T>():各 feature 定义自己 wiring key 的公共工厂
 │
@@ -179,7 +179,7 @@ org.nigao.zhihuLite
 │
 ├── business_logic/                     # 层 4:业务的纯逻辑(模块间禁止互相 import)
 │   ├── shared/
-│   │   └── image/ImageLoader.kt        # 图片加载抽象(纯接口;Coil 实现在 business_ui)
+│   │   └── imageloading/ImageLoader.kt  # 图片加载缝：渲染器不碰 Coil(见 base_ui 说明)
 │   ├── sign/                           # ① 签名算法:纯计算,零依赖
 │   │   ├── Zse96Signer.kt              # 包装 web/Zse96 的薄适配(算法文件仍在 web/,见下方说明)
 │   │   └── SignatureProvider.kt        # 接口:sign(path, dC0): String
@@ -211,7 +211,7 @@ org.nigao.zhihuLite
 │   ├── shared/
 │   │   ├── ListFooter.kt · CommonPanel.kt · CommonSwitch.kt
 │   │   ├── ImageGallery.kt · ImageViewer.kt · 空态/错误态组件
-│   │   └── coil/CoilImageLoader.kt     # ImageLoader 的 Compose 实现
+│   │   └── imageloading/CoilImageLoader.kt # AsyncImage + 解码目标 + 成功/失败回调
 │   ├── feed/                           # 每个业务模块自带【装配出口】与【依赖接口】
 │   │   ├── FeedScreen.kt · FeedViewModel.kt · FeedUiState.kt · FeedCards.kt
 │   │   ├── FeedWiring.kt             # 【接口】本 feature 需要什么(容器来实现)
@@ -257,7 +257,7 @@ org.nigao.zhihuLite
 ZhihuLite/
 ├── model/            (kotlin-jvm + serialization)   层 1  DTO
 ├── base_logic/       (kotlin-jvm)                   层 2  纯能力：无 Android、无 Compose、零项目内依赖
-├── base_navigation/  (kotlin-jvm + serialization)   跨层词汇：AppRoute / AppNavigator
+├── base_navigation/  (kotlin-jvm + serialization)   跨层词汇：只放 AppRoute
 ├── base_ui/          (android-library + compose)    层 3  通用 UI 基建
 ├── business_logic/   (android-library + ksp + room) 层 4  业务逻辑 + Room + Zhihu 协议
 │   └── schemas/                                     Room 导出的 schema（随模块走）
@@ -1459,7 +1459,7 @@ R8 之后的关键存活项均已核对（这是 minify 最容易静默弄坏的
 |---|---|
 | `assemble` 层建立 | `assemble/container/AppContainer`（进程级单例:数据库、加密凭证存储、HTTP 面）+ `assemble/navigation/AssembleAppNavHost` |
 | 类型安全路由 | `base_navigation/AppRoute`（`@Serializable` 的 `LogInRoute` / `LogOutRoute` / `MainFeedRoute` / `QuestionDetailRoute` / `ImageViewerRoute`）；`App.kt` 与导航图改用 `composable<T>` + `toRoute<T>()` |
-| 导航解耦 | 新增 `base_navigation/AppNavigator`；屏幕不再接收 `NavController`，改为 `onNavigate: (AppRoute) -> Unit` 回调，返回键/回退栈策略集中在 `assemble` |
+| 导航解耦 | 屏幕不再接收 `NavController`，改为 `onNavigate: (AppRoute) -> Unit` 回调，返回键/回退栈策略集中在 `assemble`（当时还新增了 `base_navigation/AppNavigator`，但它从未被实现或调用，后来删除 —— 见 §7.56） |
 | **删除 Gaia 与 registerRoute** | `registerRoute/` 包、`@GaiaListen` 注解、KSP 生成的事件总线注册表、`com.nigao.gaia.registerAll()` 调用、`:app:gaia` 模块与其 KSP 依赖**全部删除**（含 `settings.gradle.kts` 与 `app/build.gradle.kts`） |
 | DI 收敛 | 两个 ViewModel 工厂改为经 `AppContainer` 取依赖（`container.feedStorage()` / `feedApi` / `answerApi`），不再各自 `new` 存储或读取 `Application` 具体类型 |
 
@@ -1504,7 +1504,7 @@ model/
 | 层 | 迁入内容 |
 |---|---|
 | `base_logic` | `basicTypeExtension` 里真正的纯工具：`text/IntFormat`、`format/TimestampFormatter`（其余三个依赖 Compose，见下） |
-| `base_ui` | `basicTypeExtension` 中依赖 Compose 的三个：`ModifierExtender`（`noRippleClickable`）、`ColorExtender`、`StringExtender` |
+| `base_ui` | `basicTypeExtension` 中依赖 Compose 的三个：`ModifierExtender`（`noRippleClickable`）、`ColorExtender`、`StringExtender`（后来 `String.toColor` 并入 `ColorExtender`，`StringExtender` 删除） |
 | `business_logic/zhihu` | `network/FeedApi.kt` → `ZhihuApi.kt`（`ZhihuApi` + `sharedJson` + `sharedHttpClient`，即协议与传输）、`AnswerApi` → `business_logic/feed/data/KtorAnswerApi.kt` |
 | `business_logic/zhihu/sign` | `web/Zse96.kt` + `Zse96Tables.kt`（已验证的 JS 移植，一行未改） |
 | `business_logic/feed` | `eventReporter/EventReporter.kt` |
@@ -1761,7 +1761,7 @@ excerpt: 8年互联网大厂产品经理，我坐过的工学椅不下10把…�
 
 **② 冷启动丢弃数据库内容，全屏 loading，不展示上次内容。**
 
-- `FeedOperations.discardStoredFeedOnColdStart()`：**每进程一次**（对象是容器里的进程级单例），清空 `feed_item` + `feed_query`（`FeedStorage.clearAll()` → `FeedDao.clearAllFeedData()` 一个事务，避免观察者看到"删了一半"的列表）。失败只记日志、不抛出、且不置位以便下次重试——展示稍旧的内容远好过彻底加载不出来。
+- `FeedOperations.discardStoredFeed()`：**幂等**（首次清理、再次调用是 no-op；"冷启动"是调用方的语义，见 `AppContainer.discardPreviousSessionFeeds`）（对象是容器里的进程级单例），清空 `feed_item` + `feed_query`（`FeedStorage.clearAll()` → `FeedDao.clearAllFeedData()` 一个事务，避免观察者看到"删了一半"的列表）。失败只记日志、不抛出、且不置位以便下次重试——展示稍旧的内容远好过彻底加载不出来。
 - `FeedViewModel.init` 的顺序是关键，也写进了注释：**先清、再订阅、再加载**。Room 的 Flow 订阅时会立刻回放当前内容，如果先订阅，上一轮的数据会先闪一下；先清空则首次发射就是空列表，于是停在 `FeedUiState.Loading`（`LoadingFeedScreen` 就是全屏居中 spinner），直到新第一页落库。
 - **每进程一次而不是每屏一次**：旋转屏幕、从回答详情返回都不应重新加载。这个状态放在 `FeedOperations` 而不是 ViewModel，因为后者每次旋转都会重建。
 - `loadInitial()` 的"已加载就跳过请求"逻辑保留：它现在只覆盖"同一进程内离开再回到 Feed"的情况，冷启动时游标已被清掉，因此必然重新请求。
@@ -1969,8 +1969,8 @@ JSON input: ..."maxbitrate":0,"bitrate":301.201,"duration":405.185,...
 |---|---|---|---|
 | `:model` | kotlin-jvm + serialization | DTO，零项目内依赖 | `api(kotlinx-serialization)` |
 | `:base_logic` | **kotlin-jvm** | 纯能力；无 Android/Compose/Ktor | napier |
-| `:base_navigation` | kotlin-jvm + serialization | `AppRoute` / `AppNavigator` | serialization-core |
-| `:base_ui` | android-library + compose | 色彩/Modifier/字符串扩展 + 图片加载 | compose、coil、core-ktx |
+| `:base_navigation` | kotlin-jvm + serialization | `AppRoute`（唯一的跨层词汇） | serialization-core |
+| `:base_ui` | android-library + compose | 色彩/Modifier 扩展 + 图片加载（`ColorExtender` 里是 `parseColor` 与 `String.toColor`） | compose、coil、core-ktx |
 | `:business_logic` | android-library + ksp + room | 业务逻辑 + Room + Zhihu 协议 | `api(:model)`、ktor-core、room、napier、settings |
 | `:business_ui` | android-library + compose | Screen / ViewModel / 共享组件（**自带 res**） | `api(:business_logic/:base_ui/:base_logic/:base_navigation)`、lifecycle、compose |
 | `:performance` | android-library | 插桩桥 + `@NoBusinessTrace`（支撑模块，不属于任何一层） | 无 |
@@ -1998,7 +1998,7 @@ e: .../business_logic/LayeringProbe.kt:6:32 Unresolved reference 'FeedWiring'.
 2. **R 类不再共享**（`android.nonTransitiveRClass=true`）：`business_ui` 用自己的 `R`，于是它用到的 18 个字符串与 `avatar_placeholder.png` 搬进 `business_ui/src/main/res/`；`assemble` 只留 `app_name` + 图标/主题/network config。
 3. **跨模块 smart cast 失效**：`target` 由别的模块声明时，`if (target == null) return` 之后不能直接 `target.x`，两处改为先绑局部变量（`AnswerCardUiState` / `FeedItemCardState`）。
 4. **`api` vs `implementation` 被迫想清楚**：`ZhihuApi.client`（Ktor）、Room 的 DAO/实体、`HtmlNode.Element.attributes`（ImmutableMap）都出现在公开签名里 → 改 `api`；引擎、KSP、settings 留在 `implementation`。
-5. **单测留在 `:assemble`**（一个套件、一条命令，且能看见所有层）。代价是跨模块的 `internal` 测试缝必须公开：`FeedOperations.reportedKeyCount/hasReported/coldStartDiscardPerformed`、`KtorAnswerApi.parseAnswer`、`HtmlParseCache`、`SessionStore.resetForTest`、`TimestampFormatter.cachedFormatterCount`、`ListFooterPager` 构造器、`HtmlRenderer.sanitizedLinkTarget`，以及被渲染器共用的 `normalizeTagName`。每处都注释了"这是给应用模块测试套件的公开缝"。
+5. **单测留在 `:assemble`**（一个套件、一条命令，且能看见所有层）。代价是跨模块的 `internal` 测试缝必须公开：`FeedOperations.discardPerformed`、`KtorAnswerApi.parseAnswer`、`HtmlParseCache`、`SessionStore.resetForTest`、`TimestampFormatter.cachedFormatterCount`、`ListFooterPager` 构造器、`HtmlRenderer.sanitizedLinkTarget`，以及被渲染器共用的 `normalizeTagName`。每处都注释了"这是给应用模块测试套件的公开缝"。
 6. **lint 崩溃（AGP 8.7 + Kotlin 2.1）**：`NonNullableMutableLiveDataDetector` 会让 `lintVitalAnalyzeRelease` 崩（`IncompatibleClassChangeError`）。应用模块原本就 `disable "NullSafeMutableLiveData"`，现在每个 library 模块也要，否则 `:base_ui:lintVitalAnalyzeRelease` 直接失败。
 7. **perfetto 插桩范围必须改**：单模块时 `InstrumentationScope.PROJECT` 恰好等于"全部代码"；拆分后它只剩 `assemble` 自己。改成 **`ALL`** 并实测覆盖到每一层（见下）——这是"拆分会让某个功能静默减配"的典型例子。
 8. **CI 与脚本路径**：`release.yml` 的 `:app:` → `:assemble:`（APK 名也从 `app-release.apk` 变成 `assemble-release-unsigned.apk`）；`scripts/capture-perfetto.sh`、README、perfetto 文档同步。`tools/` 那套"无 Gradle 手工链"（typecheck / run_unit_tests / gen_r_class / verify）**整体删除**——它的路径与 R 生成假设已彻底失效，留着只会误导。
@@ -2059,7 +2059,7 @@ e: .../business_logic/LayeringProbe.kt:6:32 Unresolved reference 'FeedWiring'.
 
 **③ 冷启清库改到进程启动**
 
-原来 `discardStoredFeedOnColdStart()` 只在 **feed 页首次创建**时触发：如果这次进程停在登录页、或永远没进 Feed，上一进程的存储就会活到下一次。现在 `AppContainer.discardPreviousSessionFeeds()`（返回 `Job`，既是启动入口也是测试缝）由 **`DefaultApplication.onCreate`** 调用；`FeedViewModel` 仍然先 await 再订阅，所以"先清 → 再订阅 → 再加载"的顺序（§7.17 的防闪屏保证）没变。`coldStartResetStarted()`（同模块 `internal`）用来断言 onCreate 真的接线了——否则测试无法区分"onCreate 调了"和"测试自己触发了 lazy"。
+原来 `discardStoredFeedOnColdStart()` 只在 **feed 页首次创建**时触发：如果这次进程停在登录页、或永远没进 Feed，上一进程的存储就会活到下一次。现在 `AppContainer.discardPreviousSessionFeeds()`（返回 `Job`，既是启动入口也是测试缝）由 **`DefaultApplication.onCreate`** 调用（`FeedOperations` 那个方法后来按"只描述能力、不描述时机"的原则改名为 `discardStoredFeed()`，冷启动语义留在容器侧 ✓）；`FeedViewModel` 仍然先 await 再订阅，所以"先清 → 再订阅 → 再加载"的顺序（§7.17 的防闪屏保证）没变。`coldStartResetStarted()`（同模块 `internal`）用来断言 onCreate 真的接线了——否则测试无法区分"onCreate 调了"和"测试自己触发了 lazy"。
 
 **验证**
 
@@ -3096,6 +3096,39 @@ Column(Modifier.padding(vertical = 8.dp)) { … } // ← 外层 Column 又一个
 **测试迁移**：`FeedOperationsTest` 里 5 条上报用例删除 ✓（覆盖没丢：去重/无 target → `EventReporterBatchingTest` ✓（顺手补了"无 target 不入队"一条 ✓）；展现≠已读、已读只报一次 → 两个 `*ReadReportingTest` ✓）；`FeedReadReportingTest` 改为断言 `sharedEventReporter.hasReported(...)` ✓，并**换上自己的 answer id** ✓ —— 去重记录是进程级的 ✓，多个测试共用 id 会互相干扰 ✓（`AnswerFeedReadReportingTest` 本来就标注了这条规则 ✓）。
 
 **验证**：**229 例 0 失败** ✓（233 − 5 + 1 ✓）；真机复测：新路径下首屏仍发出 `reported 3 displayed item(s) in one request` ✓，`EventReporter` 告警 **0** ✓。
+
+### 7.56 删掉 `AppNavigator`：一个从未被实现的接口
+
+`base_navigation/AppNavigator`（`fun navigateTo(route: AppRoute)`）全仓库**只有它自己的定义** ✓ —— 没有实现、没有调用 ✓（`grep -rn AppNavigator` 除定义外只命中 build 注释与文档 ✓）。实际机制是 `onNavigate: (AppRoute) -> Unit` 回调 ✓：VM 算出 `AppRoute`（如 `FeedViewModel.destinationFor` ✓），屏幕把回调交给壳 ✓。
+
+它来自早期"让 VM 直接导航"的设计 ✓，后来实现改成回调 ✓，接口被落下 ✗ —— 留着只会让下一个人以为它是导航入口 ✗。已删除 ✓，并同步了两处**描述现状**的文档（模块图、模块表 ✓）；**历史修订记录**那条保持原样、只加了一句指向本节的说明 ✓（不重写历史 ✓）。
+
+**验证**：删掉的代码没有任何引用 ✓，debug/release/perfetto 三变体构建通过 ✓，**229 例测试全绿** ✓ —— `:base_navigation` 现在只剩 `AppRoute.kt` ✓。
+
+### 7.57 `ImageLoader` 这层"到底多做了什么"：把注释改成真的
+
+用户连问两问："为什么要封装 `CoilImageLoader`"、"相较 `AsyncImage` 它额外做了什么"。查证后**保留接口、只修注释** ✓ —— 因为它的收益是真的，只是**原注释把理由写错了**。
+
+**它实际只多做三件事**（其余与裸 `AsyncImage` 完全一致：缓存、网络、crossfade、占位/错误画法都不碰 ✓）
+
+1. **把 payload 的 CSS 尺寸翻译成 Coil 的解码目标** ✓：CSS px × density（本机 3.25）→ `ImageRequest.size(...)`，并以 `coerceIn(1, 4096)` 挡住脏值；否则一张 `_1440w` 图会被按全分辨率解码并常驻内存，只为画几百像素宽 ✓ —— 这才是主要收益 ✓。
+2. **`remember(src, targetWidth, targetHeight, context, density)`** ✓：滚动时不在每次重组重建请求 ✓。
+3. **把 Coil 的 `State.Success/Error` 翻译成两个普通 lambda** ✓：`onIntrinsicSize`（真实位图尺寸 → 纠正占位宽高比 ✓ §7.48）、`onError(throwable)`（区分"取消"与真失败 ✓ §7.51）—— 没有这层，渲染器就要 import Coil 的 `SuccessResult` 类型 ✓。
+
+**改掉的两处错误/过时说法**
+
+| 位置 | 原文 | 问题 | 现在 |
+|---|---|---|---|
+| `ImageLoader` 接口 KDoc | "supports different platforms" | 项目只有 Android ✗，是空话 | 写实三条：渲染器不碰 Coil ✓；解码目标（density + 上限）集中一处 ✓；`null` = 此处不加载图片 → 占位图（预览/纯文本）✓ |
+| `HtmlRenderer.ImageElement` 注释 | "a raw AsyncImage … **jumps when it resolves**" | 只对**没声明尺寸**的图成立（110 张里 6 张 ✓）；有 `aspectRatio` 的占位是确定的 ✓ | 写成"收益是解码尺寸/内存 ✓；跳动只在没声明尺寸时 ✓" |
+| `CoilImageLoader` | 无 KDoc ✗ | 抽象的价值/边界没写下来 | 补上（含"单边尺寸不设解码目标"这个已知缺口 ✓） |
+| 计划里的目录树两行 | 说接口在 `business_logic/shared`、Coil 实现在 `business_ui` | 早已迁到 `base_ui/imageloading` ✗ | 更正 ✓ |
+
+**同时记下它的真实局限**（评估过、暂不动 ✓）：只有一个实现 ✓，没有测试替身 ✓（`SampleImageLoader` 早在 Phase 1 按死抽象删除 ✓）；`business_ui` 本来就直连 Coil（5 处 `AsyncImage` ✓），所以"把 Coil 挡在业务层外"只在**渲染器内部**成立 ✓；`null` 路径生产上无人使用 ✓。
+
+**若哪天要删这层**（本次未做 ✓）：最小形态不是回到裸 `AsyncImage` ✗，而是把这 10 行搬成 `base_ui` 里的普通 `@Composable fun LoadImage(...)` ✓，否则全分辨率解码与 Coil 类型外溢会回来 ✓。
+
+**验证**：纯注释/文档改动 ✓；**229 例 0 失败** ✓，debug 构建通过 ✓。
 
 ## 8. 风险与对策
 

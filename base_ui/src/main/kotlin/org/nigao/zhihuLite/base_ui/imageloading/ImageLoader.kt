@@ -17,11 +17,20 @@ import coil3.request.ImageRequest
 private const val MAX_COIL_TARGET_SIZE = 4096
 
 /**
- * Interface for image loading that supports different platforms.
+ * How the renderer loads a picture, without the renderer knowing about Coil.
  *
- * [targetWidth]/[targetHeight] carry the (CSS pixel) size parsed from the `width`/`height`
- * attributes so implementations can size their decode target instead of loading full
- * resolution bitmaps.
+ * Three concrete reasons, and none of them is cross-platform (the app is Android-only):
+ *
+ *  - `HtmlRenderer` describes what it wants — a url, the size the payload declared, and what to do
+ *    when the bitmap arrives or fails — and imports nothing from Coil.
+ *  - Turning that declared size into a decode target is one decision made in one place: CSS pixels
+ *    scaled by the display density, and capped so a nonsense attribute cannot ask for a huge
+ *    allocation. `[targetWidth]`/`[targetHeight]` carry the CSS pixels for exactly that.
+ *  - `null` means "nothing can load images here", which is what a preview or a plain-text context
+ *    passes; the renderer draws a placeholder instead.
+ *
+ * Caching, the network and what a failure looks like are Coil's, untouched: this is a seam over
+ * `AsyncImage`, not a replacement for it.
  */
 interface ImageLoader {
     @Composable
@@ -49,6 +58,20 @@ interface ImageLoader {
     )
 }
 
+/**
+ * `AsyncImage` plus the two things the seam exists for: a decode target, and the callbacks as plain
+ * lambdas.
+ *
+ * The declared size is CSS pixels, so it is scaled by the display density before becoming the
+ * request's decode size — otherwise a 1440px bitmap is decoded and held in memory to draw something
+ * a few hundred pixels wide. Only when both dimensions are known: one alone is not a size this can
+ * use. The request is remembered on those inputs so scrolling does not rebuild it on every
+ * recomposition.
+ *
+ * The callbacks keep Coil's types out of the renderer: a real failure is told apart from a
+ * cancellation by its cause, and the decoded size corrects a payload whose declared ratio disagrees
+ * with the file.
+ */
 object CoilImageLoader: ImageLoader {
     @Composable
     override fun LoadImage(
