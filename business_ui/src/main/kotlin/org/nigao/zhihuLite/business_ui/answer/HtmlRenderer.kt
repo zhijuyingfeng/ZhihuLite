@@ -50,6 +50,14 @@ import org.nigao.zhihuLite.business_logic.answer.normalizeTagName
 import org.nigao.zhihuLite.business_ui.video.VideoElement
 import androidx.compose.ui.res.stringResource
 import org.nigao.zhihuLite.business_ui.R
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.BaselineShift
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.draw.drawBehind
 
 /**
  * Renders parsed answer/comment HTML as Compose UI.
@@ -179,7 +187,14 @@ private fun HtmlNodesToComposeUi(
                         "h4" -> HeadingElement(node, MaterialTheme.typography.titleLarge)
                         "h5" -> HeadingElement(node, MaterialTheme.typography.titleMedium)
                         "h6" -> HeadingElement(node, MaterialTheme.typography.titleSmall)
-                        "p" -> ParagraphElement(node, textStyle, linkStyle, onLinkClick)
+                        // A paragraph with no text is not content. Zhihu's editor leaves
+                        // `<p class="ztext-empty-paragraph"><br/></p>` behind — 148 of them in 59
+                        // answers, 26 of those between two pictures — and a paragraph drawn empty
+                        // still takes a line, which is most of the white the reader sees between
+                        // images. `<p>text<br/></p>` has text and is kept.
+                        "p" -> if (remember(node) { collectTextContent(node).isNotBlank() }) {
+                            ParagraphElement(node, textStyle, linkStyle, onLinkClick)
+                        }
                         "ul" -> ListElement(node, textStyle, linkStyle, ordered = false, onLinkClick = onLinkClick)
                         "ol" -> ListElement(node, textStyle, linkStyle, ordered = true, onLinkClick = onLinkClick)
                         "li" -> ListItemElement(node, textStyle, linkStyle, onLinkClick, answerId)
@@ -192,6 +207,29 @@ private fun HtmlNodesToComposeUi(
                             LinkElement(node, textStyle, linkStyle, onLinkClick)
                         }
                         "img" -> ImageElement(node, textStyle, imageLoader)
+                        // Wrappers that must leave no trace: a picture in a `figure`, markup in a
+                        // `noscript` fallback. Rendering their children is the whole job.
+                        "figure", "noscript" -> TransparentContainer(
+                            answerId, node, textStyle, linkStyle, imageLoader, onLinkClick, depth,
+                        )
+                        // The caption under a picture: same inline content, smaller and quiet.
+                        "figcaption" -> CaptionElement(
+                            answerId, node, textStyle, linkStyle, imageLoader, onLinkClick, depth,
+                        )
+                        "blockquote" -> BlockQuoteElement(
+                            answerId, node, textStyle, linkStyle, imageLoader, onLinkClick, depth,
+                        )
+                        "hr" -> HorizontalDivider(
+                            thickness = 1.dp,
+                            color = Color.Black.copy(alpha = 0.12f),
+                            modifier = Modifier.padding(vertical = 12.dp),
+                        )
+                        // Inline markup that arrived as a block of its own: bold text on its own
+                        // line, a footnote marker, a wrapper `span`. Without this each one drew an
+                        // unknown-tag box instead of its text.
+                        "b", "strong", "i", "em", "u", "s", "span", "sup" -> InlineElement(
+                            node, textStyle, linkStyle, onLinkClick,
+                        )
                         // A line break between two block-level fragments. Comment bodies arrive as
                         // `text<br>text`, so without this the break was lost and (in debug) the
                         // element fell through to the unknown-tag box.
@@ -366,6 +404,28 @@ private fun MonospaceElement(
     )
 }
 
+/**
+ * The size to lay an image out at, from the attributes the payloads actually carry.
+ *
+ * Measured across 110 images in 59 answers: `width`/`height` are present on 104 of them, and every
+ * one carries `data-rawwidth`/`data-rawheight` as well. Reading both means the remaining six keep
+ * their aspect ratio instead of jumping when the bitmap resolves.
+ */
+fun htmlImageIntrinsicSize(element: HtmlNode.Element): HtmlImageSize? {
+    val width = element.attributes["width"]?.trim()?.toIntOrNull()
+        ?: element.attributes["data-rawwidth"]?.trim()?.toIntOrNull()
+    val height = element.attributes["height"]?.trim()?.toIntOrNull()
+        ?: element.attributes["data-rawheight"]?.trim()?.toIntOrNull()
+    return if (width != null && height != null && width > 0 && height > 0) {
+        HtmlImageSize(width, height)
+    } else {
+        null
+    }
+}
+
+/** An image's intrinsic size, as the payload reports it. */
+data class HtmlImageSize(val width: Int, val height: Int)
+
 @Composable
 private fun ImageElement(
     element: HtmlNode.Element,
@@ -374,29 +434,32 @@ private fun ImageElement(
 ) {
     val src = element.attributes["src"].orEmpty()
     val altText = element.attributes["alt"].orEmpty()
-    val width = element.attributes["width"]?.trim()?.toIntOrNull()
-    val height = element.attributes["height"]?.trim()?.toIntOrNull()
+    val size = htmlImageIntrinsicSize(element)
 
+    // The spacing between blocks lives on the column, once. It used to be here *and* there, which put
+    // 16dp of white above and below every picture — measured at 24dp from the image to its caption.
+    //
+    // 4dp matches what a paragraph carries, so a picture sits in the text's own rhythm; at 8dp two
+    // pictures in a row (which is how a run of figures arrives) stood 16dp apart.
     val modifier = Modifier
-        .padding(vertical = 8.dp)
         .fillMaxWidth()
         .clip(RoundedCornerShape(4.dp))
 
-    Column(Modifier.padding(vertical = 8.dp)) {
+    Column(Modifier.padding(vertical = 4.dp)) {
         if (imageLoader != null && src.isNotEmpty()) {
             // Route through the injected loader so the parsed width/height become the decode target;
             // a raw AsyncImage here decodes at full resolution and jumps when it resolves.
             imageLoader.LoadImage(
                 src = src,
                 contentDescription = altText.ifBlank { null },
-                modifier = if (width != null && height != null && width > 0 && height > 0) {
-                    modifier.aspectRatio(width.toFloat() / height.toFloat())
+                modifier = if (size != null) {
+                    modifier.aspectRatio(size.width.toFloat() / size.height.toFloat())
                 } else {
                     modifier
                 },
                 contentScale = ContentScale.Fit,
-                targetWidth = width,
-                targetHeight = height,
+                targetWidth = size?.width,
+                targetHeight = size?.height,
             )
         } else {
             PlaceholderImage(altText, modifier)
@@ -413,6 +476,140 @@ private fun ImageElement(
             )
         }
     }
+}
+
+/**
+ * Renders an element's children and nothing of the element itself.
+ *
+ * `figure` around a picture and `noscript` around the no-script fallback are containers, not content:
+ * drawing a wrapper for them (or the debug-only tag box, which is what used to happen) adds a frame
+ * the reader never asked for.
+ */
+@Composable
+private fun TransparentContainer(
+    answerId: String?,
+    element: HtmlNode.Element,
+    baseStyle: TextStyle,
+    linkStyle: SpanStyle,
+    imageLoader: ImageLoader?,
+    onLinkClick: (String) -> Unit,
+    depth: Int,
+) {
+    if (depth >= MAX_RENDER_DEPTH) {
+        val flattened = remember(element) { collectTextContent(element) }
+        if (flattened.isNotBlank()) Text(text = flattened, style = baseStyle)
+        return
+    }
+    HtmlNodesToComposeUi(
+        nodes = element.children,
+        answerId = answerId,
+        textStyle = baseStyle,
+        linkStyle = linkStyle,
+        imageLoader = imageLoader,
+        onLinkClick = onLinkClick,
+        depth = depth + 1,
+    )
+}
+
+/** A picture's caption: smaller, quieter, centred under the image. */
+@Composable
+private fun CaptionElement(
+    answerId: String?,
+    element: HtmlNode.Element,
+    baseStyle: TextStyle,
+    linkStyle: SpanStyle,
+    imageLoader: ImageLoader?,
+    onLinkClick: (String) -> Unit,
+    depth: Int,
+) {
+    HtmlNodesToComposeUi(
+        nodes = element.children,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 2.dp),
+        answerId = answerId,
+        textStyle = baseStyle.copy(
+            fontSize = baseStyle.fontSize * 0.85f,
+            // Pinned, not inherited: with the body's 24sp line the caption floated well below its
+            // picture, and the leading is most of what the reader sees as a gap.
+            lineHeight = baseStyle.fontSize * 0.85f * 1.35f,
+            color = Color.Black.copy(alpha = 0.55f),
+            textAlign = TextAlign.Center,
+        ),
+        linkStyle = linkStyle,
+        imageLoader = imageLoader,
+        onLinkClick = onLinkClick,
+        depth = depth + 1,
+    )
+}
+
+/**
+ * A quotation: indented, with a bar down its left side.
+ *
+ * The bar is drawn behind the content rather than laid out as a sibling: a sibling had to be given the
+ * content's height, and `IntrinsicSize.Min` with a weighted child resolved to a single line — measured
+ * on the device, a four-line quote got a one-line bar.
+ */
+@Composable
+private fun BlockQuoteElement(
+    answerId: String?,
+    element: HtmlNode.Element,
+    baseStyle: TextStyle,
+    linkStyle: SpanStyle,
+    imageLoader: ImageLoader?,
+    onLinkClick: (String) -> Unit,
+    depth: Int,
+) {
+    val barColor = Color.Black.copy(alpha = 0.18f)
+    val barWidth = 3.dp
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 6.dp)
+            .drawBehind {
+                val width = barWidth.toPx()
+                drawRoundRect(
+                    color = barColor,
+                    size = Size(width, size.height),
+                    cornerRadius = CornerRadius(width / 2f),
+                )
+            }
+            // Room for the bar itself, so the text never sits on it.
+            .padding(start = barWidth + 10.dp),
+    ) {
+        HtmlNodesToComposeUi(
+            nodes = element.children,
+            answerId = answerId,
+            textStyle = baseStyle,
+            linkStyle = linkStyle,
+            imageLoader = imageLoader,
+            onLinkClick = onLinkClick,
+            depth = depth + 1,
+        )
+    }
+}
+
+/**
+ * Inline markup rendered as a block: `<b>text</b>` on its own line, a `sup` footnote marker, a
+ * `span` wrapper. Goes through the same inline builder a paragraph uses, so bold, links and the
+ * superscript shift all keep working.
+ */
+@Composable
+private fun InlineElement(
+    element: HtmlNode.Element,
+    baseStyle: TextStyle,
+    linkStyle: SpanStyle,
+    onLinkClick: (String) -> Unit,
+) {
+    val annotatedText = remember(element, baseStyle, linkStyle) {
+        buildAnnotatedString { collectStyledText(element, baseStyle, linkStyle, this) }
+    }
+    LinkAwareText(
+        text = annotatedText,
+        style = baseStyle,
+        modifier = Modifier.padding(vertical = 2.dp),
+        onLinkClick = onLinkClick,
+    )
 }
 
 @Composable
@@ -580,6 +777,22 @@ private fun collectStyledText(
                     node.children.forEach { collectStyledText(it, baseStyle, linkStyle, this) }
                 }
                 "br" -> builder.append('\n')
+                // A citation marker: `[1]`, raised, linking to the source it cites.
+                "sup" -> {
+                    val url = node.attributes["data-url"]
+                    val raised = SpanStyle(baselineShift = BaselineShift.Superscript)
+                    if (!url.isNullOrBlank()) {
+                        builder.pushStringAnnotation(tag = LINK_ANNOTATION_TAG, annotation = url)
+                        builder.withStyle(linkStyle.merge(raised)) {
+                            node.children.forEach { collectStyledText(it, baseStyle, linkStyle, this) }
+                        }
+                        builder.pop()
+                    } else {
+                        builder.withStyle(raised) {
+                            node.children.forEach { collectStyledText(it, baseStyle, linkStyle, this) }
+                        }
+                    }
+                }
                 "a" -> {
                     val href = node.attributes["href"] ?: ""
                     builder.pushStringAnnotation(tag = LINK_ANNOTATION_TAG, annotation = href)
