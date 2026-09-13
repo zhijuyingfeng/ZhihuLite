@@ -17,9 +17,7 @@ object TimestampFormatter {
         "YYYYMMDD" to "yyyyMMdd",
         "YYYY-MM-DD" to "yyyy-MM-dd",
         "YYYY/MM/DD" to "yyyy/MM/dd",
-        "YYYY年MM月DD日" to "yyyy年MM月dd日",
         "YYMMDD" to "yyMMdd",
-        "YY年MM月DD日" to "yy年MM月dd日",
         "DD/MM/YYYY" to "dd/MM/yyyy",
         "DD-MM-YYYY" to "dd-MM-yyyy",
         "MM/DD/YYYY" to "MM/dd/yyyy",
@@ -29,7 +27,6 @@ object TimestampFormatter {
         "YYYYMMDDHHmmss" to "yyyyMMddHHmmss",
         "HH:mm:ss" to "HH:mm:ss",
         "HH:mm" to "HH:mm",
-        "YYYY年MM月DD日 HH:mm:ss" to "yyyy年MM月dd日 HH:mm:ss",
         "YYYY-MM-DDTHH:mm:ssZ" to "yyyy-MM-dd'T'HH:mm:ssXXX",
         "YYYY-MM-DDTHH:mm:ss" to "yyyy-MM-dd'T'HH:mm:ss",
         "YYYY-MM" to "yyyy-MM",
@@ -74,9 +71,10 @@ object TimestampFormatter {
 
             zonedDateTime.format(formatterFor(pattern))
         } catch (e: Exception) {
-            // 保留原来的降级行为（返回可读的错误串），但改用 Napier 记录，release 下不再静默。
+            // Degrade to an empty string: a reader-facing message here would be a hard-coded
+            // string in the wrong layer, and this is a formatter. Napier already records the cause.
             Napier.e("Timestamp formatting failed for format=$format", e)
-            "格式转换错误: ${e.message}"
+            ""
         }
     }
 

@@ -48,6 +48,8 @@ import org.nigao.zhihuLite.business_logic.answer.HtmlNode
 import org.nigao.zhihuLite.business_logic.answer.HtmlParseCache
 import org.nigao.zhihuLite.business_logic.answer.normalizeTagName
 import org.nigao.zhihuLite.business_ui.video.VideoElement
+import androidx.compose.ui.res.stringResource
+import org.nigao.zhihuLite.business_ui.R
 
 /**
  * Renders parsed answer/comment HTML as Compose UI.
@@ -525,8 +527,12 @@ private fun PlaceholderImage(contentDescription: String, modifier: Modifier = Mo
                 modifier = Modifier.size(48.dp),
             )
             Spacer(Modifier.height(8.dp))
+            val placeholder = stringResource(R.string.html_image_placeholder)
             Text(
-                text = "Image: ${contentDescription.ifBlank { "Placeholder" }}",
+                text = stringResource(
+                    R.string.html_image_description,
+                    contentDescription.ifBlank { placeholder },
+                ),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

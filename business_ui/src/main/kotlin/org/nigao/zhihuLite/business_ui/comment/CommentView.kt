@@ -78,10 +78,7 @@ fun CommentView(
             )
         }
         is CommentViewUiState.Failed -> {
-            CommentFailedView(
-                uiState = uiState as CommentViewUiState.Failed,
-                viewModel = viewModel
-            )
+            CommentFailedView(viewModel = viewModel)
         }
     }
 }
@@ -108,7 +105,6 @@ fun CommentLoadingView(
 
 @Composable
 fun CommentFailedView(
-    uiState: CommentViewUiState.Failed,
     modifier: Modifier = Modifier,
     viewModel: CommentViewModel,
 ) {
@@ -122,9 +118,7 @@ fun CommentFailedView(
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text(
-            text = uiState.message
-        )
+        Text(text = stringResource(R.string.comment_load_failed))
     }
 }
 

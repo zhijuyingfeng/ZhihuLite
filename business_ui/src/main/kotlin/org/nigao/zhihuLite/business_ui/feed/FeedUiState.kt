@@ -12,5 +12,5 @@ sealed class FeedUiState {
      * to be shown to the user. Previously this state was never produced, so a failed
      * first load left the screen on an endless spinner.
      */
-    class Failed(val reason: String, val retry: () -> Unit): FeedUiState()
+    class Failed(val retry: () -> Unit): FeedUiState()
 }

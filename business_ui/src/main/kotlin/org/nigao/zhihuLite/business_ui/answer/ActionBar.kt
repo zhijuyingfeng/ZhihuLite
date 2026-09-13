@@ -63,7 +63,7 @@ fun ActionBar(
         ) {
             Icon(
                 imageVector = Icons.Filled.ArrowUpward,
-                contentDescription = "Vote up",
+                contentDescription = stringResource(R.string.action_vote_up),
                 tint = Color(0xFF2196F3),
                 modifier = Modifier.size(20.dp)
             )
@@ -87,7 +87,7 @@ fun ActionBar(
         ) {
             Icon(
                 imageVector = Icons.Filled.ArrowDownward,
-                contentDescription = "Vote down",
+                contentDescription = stringResource(R.string.action_vote_down),
                 tint = Color(0xFF2196F3),
                 modifier = Modifier.size(20.dp)
             )
@@ -100,7 +100,7 @@ fun ActionBar(
         ) {
             Icon(
                 imageVector = Icons.Outlined.ModeComment,
-                contentDescription = "Comment",
+                contentDescription = stringResource(R.string.action_comment),
                 tint = Color.Gray,
                 modifier = Modifier.size(20.dp)
             )

@@ -1,5 +1,7 @@
 package org.nigao.zhihuLite.business_ui.answer
 
+import androidx.annotation.StringRes
+
 /**
  * Screen state. [cardStates] is declared on the base type so existing call sites that
  * read `uiState.cardStates` keep compiling while callers can also branch on the state.
@@ -16,7 +18,7 @@ sealed class AnswerFeedUiState {
          * Non-null means the list is still usable but the target answer is missing — which used to
          * happen silently.
          */
-        val pinWarning: String? = null,
+        @StringRes val pinWarningRes: Int? = null,
     ) : AnswerFeedUiState()
 
     object Loading : AnswerFeedUiState() {
@@ -28,7 +30,6 @@ sealed class AnswerFeedUiState {
      * to be shown to the user.
      */
     class Failed(
-        val reason: String,
         val retry: () -> Unit,
     ) : AnswerFeedUiState() {
         override val cardStates: List<AnswerCardUiState> = emptyList()

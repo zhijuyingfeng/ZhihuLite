@@ -164,7 +164,7 @@ fun FailedFeedScreen(
         modifier = modifier.fillMaxSize().padding(16.dp),
     ) {
         Text(
-            text = uiState.reason.ifBlank { stringResource(R.string.feed_load_failed) },
+            text = stringResource(R.string.feed_load_failed),
             textAlign = TextAlign.Center,
             fontSize = 16.sp,
         )

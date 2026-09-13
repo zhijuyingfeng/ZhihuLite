@@ -21,7 +21,7 @@ sealed class CommentViewUiState {
          */
         val children: Map<String, CommentChildrenState> = emptyMap(),
     ): CommentViewUiState()
-    class Failed(val message: String): CommentViewUiState()
+    object Failed : CommentViewUiState()
 }
 
 data class CommentUiState(

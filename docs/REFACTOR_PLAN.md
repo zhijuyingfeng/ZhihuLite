@@ -2726,6 +2726,78 @@ UI 在滑块的 `onValueChangeFinished` 里紧接着 `requestSeekTo(...)` 调用
 
 正文本身的行高**没有动**：`HtmlToComposeUi` 用的是 `baseTextStyle`（默认正文字号 + 正常行距），多行文字的疏密保持不变。
 
+### 7.43 图片查看器：长按菜单（分享 / 保存）
+
+**需求**：在图片查看器长按弹出菜单（黑底白字），两项——分享图片（系统分享）、保存图片（存到 `Pictures/ZhihuLite`）。
+
+**实现**
+
+| 层 | 内容 |
+|---|---|
+| `business_logic/share/ImageExport.kt`（新） | `downloadImage`（复用 `ZhihuApi.client`，含超时；先判 `isSuccess` 再取字节，免得把错误页存成图片）、`saveImageToPictures`、`shareImage`，以及纯函数 `imageExportFileName` / `imageExportMimeType` / `imageShareIntent` |
+| 保存 | Android 10+ 走 `MediaStore` + `RELATIVE_PATH = Pictures/ZhihuLite`（不需要权限 ✓），先写 `IS_PENDING=1`、写完再置 0，失败则删掉那条记录；**10 以下**没有 `RELATIVE_PATH`，走公共目录 + `MediaScannerConnection`，需要 `WRITE_EXTERNAL_STORAGE`（manifest 里声明 `maxSdkVersion=28`），因此在 APK 29 以下由 UI 申请权限并**在授权后自动重试保存** |
+| 分享 | 图片先写进 `cacheDir/shared_images/`（每次分享前清空旧文件），经 `FileProvider`（`${applicationId}.fileprovider` + `cache-path`）交给系统分享面板；分享**不写相册** |
+| UI | `ImageViewer` 的长按 → 在按点弹出菜单（黑底白字，按估算尺寸夹在屏幕内），其它区域点击或翻页即关闭；下载中显示居中转圈并挡住第二次操作；反馈用 `Toast`（这是本项目第一处 Toast） |
+
+**几个刻意的选择**
+
+- 文件名 `ZhihuLite_yyyyMMdd_HHmmss.jpg`：可排序、明显是本 App 存的；扩展名从 URL **路径**取（`..._qhd.jpg?source=...`，查询串必须先切掉），认不出的一律当 JPEG。
+- 菜单文案用了你给的中文（"分享图片"/"保存图片"），Toast 也是中文；App 其它界面文案是英文——和"倍速播放中"一样，这是第二处中文，要统一说一声。
+
+**验证**
+
+| 手段 | 结果 |
+|---|---|
+| 单测 | 新 `ImageExportTest` **5 例**：目录常量 = `Pictures/ZhihuLite`、文件名格式、扩展名/查询串、分享 Intent（action/type/`EXTRA_STREAM`/**`FLAG_GRANT_READ_URI_PERMISSION`**）、以及 API 28 无权限时返回 `ImageNeedsPermission` |
+| 真机·保存 | 触发保存后 `/sdcard/Pictures/ZhihuLite/ZhihuLite_20260913_154320.jpg` **真实存在**（153 KB）✓ |
+| 真机·分享 | 系统分享面板正常弹出，MIUI 的分享管理记录到 `content://org.nigao.zhihuLite.fileprovider/shared_images/ZhihuLite_...jpg` ✓ |
+| 真机·菜单 | 截图确认黑底白字、"分享图片"/"保存图片"两项、位置在按点 ✓ |
+
+**未验证**：① 分享面板里**选中某个目标后**对方是否真能读到文件——`FLAG_GRANT_READ_URI_PERMISSION` 两侧都设了、URI 也成功建出（配错时 `getUriForFile` 会直接抛），但"选目标"这一步我点不了（设备禁止注入事件）；日志里有一条 chooser 进程 `Permission Denial` 是**系统 chooser 预览**尝试打开该 URI 被拒，属已知行为，不影响选中后的授权。② API 26–28 的旧路径（公共目录 + 扫库）没有设备可测，只有单测覆盖了"无权限要申请"这一分支。
+
+### 7.44 语言统一：所有文案走资源，中文/英文都从 XML 读
+
+**用户要求**：不要在代码里 hard code 中文，中文与英文都通过 XML 配置读取。
+
+**先说查出来的两个既有问题**
+
+| 问题 | 影响 |
+|---|---|
+| 我上一轮把 8 条中文（`分享图片` 等 + `倍速播放中`）写进了**默认** `values/strings.xml` | 默认资源是**所有语言**的兜底 → 中文会出现在英文设备上；而且"默认是英文"这条约定被破坏了 |
+| 既有的中文文件叫 **`values-cn`** | **`cn` 不是 Android 能解析的语言限定符**（中文是 `zh`）→ 那 19 条中文**从来没有生效过**，中文设备一直看的是英文 |
+
+**改动**
+
+1. `values-cn` → **`values-zh`**（两个模块 ✓）；中文翻译补齐到 **42 条全量**（原来只有 19 条 ✗，且残留一条已删除的 `login_timeout_message` ✓ 一并清掉）。
+2. 我上一轮那 8 条中文移到 `values-zh/`，默认 `values/` 全部改成英文（`分享图片` → `Share image`、`倍速播放中` → `2× speed` …）。
+3. **代码里剩下的硬编码文案**（不只中文）全部改成资源读取：
+
+| 位置 | 原本 | 现在 |
+|---|---|---|
+| `AnswerFeedViewModel` | `"该回答可能已删除，无法置顶显示"` / `"无法加载该回答，请检查网络后重试"` | 状态里改带 `@StringRes pinWarningRes: Int?`，由 UI `stringResource` 解析 |
+| `FeedViewModel` / `AnswerFeedViewModel` | `reason = "Network failed. Try again"` | 状态不再带 `reason`，屏幕统一用 `R.string.feed_load_failed` |
+| `CommentViewModel` | `"Failed to load comments"` | `CommentViewUiState.Failed` 变成 object，用 `R.string.comment_load_failed` |
+| `ActionBar` | `contentDescription = "Vote up" / "Vote down" / "Comment"` | 三个资源（读屏用户也受影响，属于文案） |
+| `HtmlRenderer` | `"Image: …"` / `"Placeholder"` | `R.string.html_image_description` / `html_image_placeholder` |
+| `TimestampFormatter` | 中文格式模式键（`YYYY年MM月DD日` 等，**无人使用**）+ `"格式转换错误: …"` | 死键删除；失败改为返回**空串**（措辞归 UI 层，才能翻译） |
+| `TestVideoPlayer.kt` | 死代码，内含中文示例 HTML | 整个文件删除 |
+
+**没有动的**：代码**注释**里的中文（例如 KDoc 里引用读者原话 `"该回答可能已删除，无法置顶显示"` 作为背景说明）——那不是界面文案，而且是有价值的记录。守卫测试只扫**字符串字面量**。
+
+**守卫测试**（`LocalizationTest`，6 例）
+
+| 用例 | 作用 |
+|---|---|
+| 默认资源不得含中文 | 防止中文再被写进 `values/` |
+| `values-zh` 与 `values/` 的键**双向**一致 | 防止漏翻译 / 残留已删的键 |
+| `app_name` 两处都存在 | 同上，App 模块 |
+| 按 locale 解析（`en` / `zh-CN`） | **证明 `values-zh` 真的生效**（这是 `values-cn` 时做不到的） |
+| `src/main` 里不得有中文字面量 | 用**状态机扫描器**取出字符串字面量并忽略注释（注释里引用中文、url 里含 `//`，正则和按行剥离都会误判；扫描器本身也有一条自测） |
+
+**验证**：210 测试 0 失败（204 + 6）；debug / release / perfetto 三变体构建成功。用 `Locale.SIMPLIFIED_CHINESE` 取 `R.string.image_menu_save` 得到 `保存图片`、默认得到 `Save image` ✓。
+
+**已知取舍**：限定符用 `values-zh` 而不是 `values-zh-rCN`，因此繁体设备也会拿到简体中文（只有简繁两套文案时不值得再细分）；要细分再加 `values-zh-rTW` 即可。
+
 ## 8. 风险与对策
 
 | 风险 | 影响 | 对策 |

@@ -100,9 +100,9 @@ fun AnswerFeedScreen(
                 // The target answer could not be pinned (deleted, or the request failed). Saying so
                 // is the whole point: the old code let this fail silently and showed the question
                 // feed as if nothing had been asked for.
-                successState.pinWarning?.let { warning ->
+                successState.pinWarningRes?.let { warningRes ->
                     Text(
-                        text = warning,
+                        text = stringResource(warningRes),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.error,
                         modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
@@ -166,7 +166,7 @@ fun AnswerFeedFailedView(
         modifier = modifier.fillMaxSize().padding(16.dp),
     ) {
         Text(
-            text = uiState.reason.ifBlank { stringResource(R.string.feed_load_failed) },
+            text = stringResource(R.string.feed_load_failed),
             textAlign = TextAlign.Center,
             fontSize = 16.sp,
         )

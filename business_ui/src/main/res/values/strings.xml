@@ -1,3 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Default (English). Every string here must also exist in values-zh/strings.xml: a test enforces
+     both directions, and that nothing here carries untranslated Chinese. -->
 <resources>
     <string name="votes_up_count">%1$d Votes Up</string>
     <string name="comment_count">%1$d Comments</string>
@@ -9,6 +12,16 @@
     <string name="list_footer_failed">Network Failed. Try again</string>
     <string name="list_footer_no_more">No more data</string>
     <string name="action_bar_share">Share</string>
+    <string name="action_vote_up">Vote up</string>
+    <string name="action_vote_down">Vote down</string>
+    <string name="action_comment">Comment</string>
+    <string name="image_menu_share">Share image</string>
+    <string name="image_menu_save">Save image</string>
+    <string name="image_saved_message">Saved to Pictures/ZhihuLite</string>
+    <string name="image_download_failed">Could not download the image</string>
+    <string name="image_save_failed">Could not save the image</string>
+    <string name="image_share_failed">Could not share the image</string>
+    <string name="image_save_no_permission">Storage permission is needed to save</string>
     <string name="comment_sort_type_score">Default</string>
     <string name="comment_sort_type_timestamp">Latest</string>
     <string name="login_load_failed">Could not load the sign-in page. Check your connection and try again.</string>
@@ -16,6 +29,7 @@
     <string name="logout_in_progress">Signing out…</string>
     <string name="feed_load_failed">Failed to load. Please try again.</string>
     <string name="retry">Retry</string>
+    <string name="comment_load_failed">Could not load comments</string>
     <string name="comment_replies_count">%1$d replies</string>
     <string name="comment_replies_hide">Hide replies</string>
     <string name="comment_replies_more">Show more replies</string>
@@ -25,5 +39,9 @@
     <string name="logout">Log out</string>
     <string name="image_viewer_empty">No images to show</string>
     <string name="video_play">Play video</string>
-    <string name="video_double_speed">倍速播放中</string>
+    <string name="video_double_speed">2× speed</string>
+    <string name="answer_pin_not_found">This answer may have been deleted and cannot be pinned</string>
+    <string name="answer_pin_failed_network">Could not load that answer. Check your connection and try again.</string>
+    <string name="html_image_description">Image: %1$s</string>
+    <string name="html_image_placeholder">Placeholder</string>
 </resources>

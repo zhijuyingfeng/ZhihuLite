@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Simplified Chinese. The qualifier is `zh` on purpose: `values-cn` is not a language Android
+     resolves, so those strings never loaded. -->
+<resources>
+    <string name="votes_up_count">%1$d 赞同</string>
+    <string name="comment_count">%1$d 评论</string>
+    <string name="edit_time">编辑于 %1$s</string>
+    <string name="votes_up">赞同</string>
+    <string name="votes_down">反对</string>
+    <string name="feed_loading">加载中</string>
+    <string name="list_footer_loading">努力加载中</string>
+    <string name="list_footer_failed">网络错误，请重试</string>
+    <string name="list_footer_no_more">暂无更多数据</string>
+    <string name="action_bar_share">分享</string>
+    <string name="action_vote_up">赞同</string>
+    <string name="action_vote_down">反对</string>
+    <string name="action_comment">评论</string>
+    <string name="image_menu_share">分享图片</string>
+    <string name="image_menu_save">保存图片</string>
+    <string name="image_saved_message">已保存到 Pictures/ZhihuLite</string>
+    <string name="image_download_failed">图片下载失败</string>
+    <string name="image_save_failed">保存失败</string>
+    <string name="image_share_failed">分享失败</string>
+    <string name="image_save_no_permission">没有存储权限，无法保存</string>
+    <string name="comment_sort_type_score">默认</string>
+    <string name="comment_sort_type_timestamp">最新</string>
+    <string name="login_load_failed">登录页加载失败，请检查网络后重试。</string>
+    <string name="login_retry">重试</string>
+    <string name="logout_in_progress">正在退出登录…</string>
+    <string name="feed_load_failed">加载失败，请重试。</string>
+    <string name="retry">重试</string>
+    <string name="comment_load_failed">评论加载失败</string>
+    <string name="comment_replies_count">%1$d 条回复</string>
+    <string name="comment_replies_hide">收起回复</string>
+    <string name="comment_replies_more">查看更多回复</string>
+    <string name="comment_replies_failed">回复加载失败，点击重试</string>
+    <string name="comment_reply_to">回复 %1$s：</string>
+    <string name="comment_likes">%1$d 赞</string>
+    <string name="logout">退出登录</string>
+    <string name="image_viewer_empty">没有可显示的图片</string>
+    <string name="video_play">播放视频</string>
+    <string name="video_double_speed">倍速播放中</string>
+    <string name="answer_pin_not_found">该回答可能已删除，无法置顶显示</string>
+    <string name="answer_pin_failed_network">无法加载该回答，请检查网络后重试</string>
+    <string name="html_image_description">图片：%1$s</string>
+    <string name="html_image_placeholder">占位图</string>
+</resources>

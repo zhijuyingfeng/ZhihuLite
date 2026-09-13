@@ -50,6 +50,8 @@ dependencies {
     api(project(":model"))
     // `ZhihuApi.client` and `EventReporter(HttpClient)` are public, so Ktor is part of the API; the
     // engine only has to be present at runtime.
+    implementation(libs.androidx.core.ktx)
+
     api(libs.ktor.client.core)
     implementation(libs.ktor.client.okhttp)
     implementation(libs.ktor.client.content.negotiation)

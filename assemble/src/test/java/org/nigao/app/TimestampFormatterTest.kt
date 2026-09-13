@@ -53,11 +53,12 @@ class TimestampFormatterTest {
     }
 
     @Test
-    fun invalidPatternDegradesToAnErrorMessageInsteadOfThrowing() {
-        // The original behaviour is preserved: a bad pattern must not crash the UI.
+    fun invalidPatternDegradesToAnEmptyStringInsteadOfThrowing() {
+        // A bad pattern must not crash the UI. It yields an empty string rather than a message: the
+        // caller owns the wording now, so it can come from the string resources (and be translated).
         val result = TimestampFormatter.formatTimestamp(epochSeconds, "YYYY-MM-DD '", ZoneId.of("UTC"))
 
-        assertTrue("expected a readable error, got: $result", result.isNotEmpty())
+        assertEquals("", result)
     }
 
     @Test

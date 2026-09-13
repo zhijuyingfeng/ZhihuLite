@@ -69,7 +69,7 @@ class CommentViewModel(
         }
 
         if (uiState.value !is CommentViewUiState.Success && response == null) {
-            _uiState.value = CommentViewUiState.Failed("Failed to load comments")
+            _uiState.value = CommentViewUiState.Failed
             return@withLock LoadMoreResult.FAILED
         } else if (response != null) {
             when (val successfulState = _uiState.value) {

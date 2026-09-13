@@ -22,6 +22,7 @@ import org.nigao.zhihuLite.business_logic.feed.data.RoomFeedRepository
 import org.nigao.zhihuLite.business_logic.feed.sharedEventReporter
 import org.nigao.zhihuLite.model.feed.FeedItem
 import org.nigao.zhihuLite.business_logic.zhihu.FeedApi
+import org.nigao.zhihuLite.business_ui.R
 
 /**
  * Question-detail screen state.
@@ -76,7 +77,7 @@ class AnswerFeedViewModel(
     private var initialLoadJob: Job? = null
 
     /** Surfaced once when the carried answer could not be resolved, instead of failing silently. */
-    private var pinWarning: String? = null
+    private var pinWarningRes: Int? = null
 
     init {
         observeFeedItems()
@@ -92,13 +93,13 @@ class AnswerFeedViewModel(
                         items.isNotEmpty() -> AnswerFeedUiState.Success(
                             cardStates = items.mapNotNull { it.toAnswerCardState() },
                             questionTitle = title.orEmpty(),
-                            pinWarning = pinWarning,
+                            pinWarningRes = pinWarningRes,
                         )
                         _uiState.value is AnswerFeedUiState.Failed -> _uiState.value
                         initialLoadSettled -> AnswerFeedUiState.Success(
                             cardStates = emptyList(),
                             questionTitle = title.orEmpty(),
-                            pinWarning = pinWarning,
+                            pinWarningRes = pinWarningRes,
                         )
                         else -> AnswerFeedUiState.Loading
                     }
@@ -122,9 +123,9 @@ class AnswerFeedViewModel(
         initialLoadJob = viewModelScope.launch {
             if (answerId != null) {
                 when (val result = pinAnswerIntoQuestionFeed(answerId)) {
-                    PinAnswerResult.NetworkFailed -> pinWarning = PIN_FAILED_NETWORK
-                    PinAnswerResult.NotFound -> pinWarning = PIN_NOT_FOUND
-                    PinAnswerResult.Pinned, PinAnswerResult.AlreadyPresent -> pinWarning = null
+                    PinAnswerResult.NetworkFailed -> pinWarningRes = R.string.answer_pin_failed_network
+                    PinAnswerResult.NotFound -> pinWarningRes = R.string.answer_pin_not_found
+                    PinAnswerResult.Pinned, PinAnswerResult.AlreadyPresent -> pinWarningRes = null
                 }
                 publishPinWarning()
             }
@@ -146,7 +147,7 @@ class AnswerFeedViewModel(
     private fun publishPinWarning() {
         val state = _uiState.value
         if (state is AnswerFeedUiState.Success) {
-            _uiState.value = state.copy(pinWarning = pinWarning)
+            _uiState.value = state.copy(pinWarningRes = pinWarningRes)
         }
     }
 
@@ -170,7 +171,6 @@ class AnswerFeedViewModel(
         initialLoadSettled = true
         if (outcome == LoadMoreOutcome.Failed) {
             _uiState.value = AnswerFeedUiState.Failed(
-                reason = "Network failed. Try again",
                 retry = { retryInitialLoad() },
             )
         } else if (_uiState.value !is AnswerFeedUiState.Success) {
@@ -228,8 +228,4 @@ class AnswerFeedViewModel(
         }
     }
 
-    companion object {
-        const val PIN_NOT_FOUND = "该回答可能已删除，无法置顶显示"
-        const val PIN_FAILED_NETWORK = "无法加载该回答，请检查网络后重试"
-    }
 }

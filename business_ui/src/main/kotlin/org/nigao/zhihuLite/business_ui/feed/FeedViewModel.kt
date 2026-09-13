@@ -127,7 +127,6 @@ class FeedViewModel(
         initialLoadSettled = true
         if (outcome == LoadMoreOutcome.Failed) {
             _uiState.value = FeedUiState.Failed(
-                reason = "Network failed. Try again",
                 retry = { retryInitialLoad() },
             )
         } else if (_uiState.value !is FeedUiState.Success) {

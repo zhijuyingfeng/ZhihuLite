@@ -111,6 +111,6 @@ class AnswerFeedContentTest {
         assertEquals(emptyList<String>(), answerApi.requested)
         assertTrue("the pinned card must carry its body", state.cardStates.first().content.contains("爱江山"))
         assertTrue("a fetched card must carry its body", state.cardStates[1].content.isNotEmpty())
-        assertNull(state.pinWarning)
+        assertNull(state.pinWarningRes)
     }
 }
