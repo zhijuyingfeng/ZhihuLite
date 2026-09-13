@@ -58,6 +58,8 @@ import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
 
 /**
  * Renders parsed answer/comment HTML as Compose UI.
@@ -435,31 +437,42 @@ private fun ImageElement(
     val src = element.attributes["src"].orEmpty()
     val altText = element.attributes["alt"].orEmpty()
     val size = htmlImageIntrinsicSize(element)
+    // The declared ratio reserves the space before the bitmap arrives; the bitmap's own ratio wins
+    // once it does, because a payload whose declared size disagrees with the file would otherwise
+    // leave bands of white above and below the picture (`ContentScale.Fit` centres what is left).
+    val loadedAspectRatio = remember(element) { mutableStateOf<Float?>(null) }
+    val declaredAspectRatio = size
+        ?.takeIf { it.width > 0 && it.height > 0 }
+        ?.let { it.width.toFloat() / it.height.toFloat() }
+    val aspectRatio = loadedAspectRatio.value ?: declaredAspectRatio
 
-    // The spacing between blocks lives on the column, once. It used to be here *and* there, which put
-    // 16dp of white above and below every picture — measured at 24dp from the image to its caption.
-    //
-    // 4dp matches what a paragraph carries, so a picture sits in the text's own rhythm; at 8dp two
-    // pictures in a row (which is how a run of figures arrives) stood 16dp apart.
+    // Spacing lives on the column, once, and only on top: it used to be here *and* on the wrapping
+    // column (16dp a side, measured at 24dp from an image to its caption). The text below a picture
+    // brings its own top padding and line leading, so padding the image's bottom too made the gap
+    // under a picture half again as big as the one above it — 12.0dp against 8.9dp, measured on a
+    // real answer. Two pictures in a row are 4dp apart, which is how a run of figures should read.
     val modifier = Modifier
         .fillMaxWidth()
         .clip(RoundedCornerShape(4.dp))
 
-    Column(Modifier.padding(vertical = 4.dp)) {
+    Column(Modifier.padding(top = 4.dp)) {
         if (imageLoader != null && src.isNotEmpty()) {
             // Route through the injected loader so the parsed width/height become the decode target;
             // a raw AsyncImage here decodes at full resolution and jumps when it resolves.
             imageLoader.LoadImage(
                 src = src,
                 contentDescription = altText.ifBlank { null },
-                modifier = if (size != null) {
-                    modifier.aspectRatio(size.width.toFloat() / size.height.toFloat())
+                modifier = if (aspectRatio != null) {
+                    modifier.aspectRatio(aspectRatio)
                 } else {
                     modifier
                 },
                 contentScale = ContentScale.Fit,
                 targetWidth = size?.width,
                 targetHeight = size?.height,
+                onIntrinsicSize = { width, height ->
+                    if (width > 0 && height > 0) loadedAspectRatio.value = width.toFloat() / height.toFloat()
+                },
             )
         } else {
             PlaceholderImage(altText, modifier)

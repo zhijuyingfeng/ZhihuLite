@@ -32,6 +32,14 @@ interface ImageLoader {
         contentScale: ContentScale,
         targetWidth: Int? = null,
         targetHeight: Int? = null,
+        /**
+         * Called with the bitmap's real size once it is decoded.
+         *
+         * The size in the payload is a hint, not a promise: when it disagrees with the file, a box
+         * reserved at the declared ratio leaves bands of white around the picture, so the caller can
+         * correct its layout. See `ImageElement`.
+         */
+        onIntrinsicSize: (width: Int, height: Int) -> Unit = { _, _ -> },
     )
 }
 
@@ -43,7 +51,8 @@ object CoilImageLoader: ImageLoader {
         modifier: Modifier,
         contentScale: ContentScale,
         targetWidth: Int?,
-        targetHeight: Int?
+        targetHeight: Int?,
+        onIntrinsicSize: (width: Int, height: Int) -> Unit,
     ) {
         val context = LocalPlatformContext.current
         val density = LocalDensity.current
@@ -62,7 +71,8 @@ object CoilImageLoader: ImageLoader {
             model = model,
             contentDescription = contentDescription,
             modifier = modifier,
-            contentScale = contentScale
+            contentScale = contentScale,
+            onSuccess = { state -> onIntrinsicSize(state.result.image.width, state.result.image.height) },
         )
     }
 }
