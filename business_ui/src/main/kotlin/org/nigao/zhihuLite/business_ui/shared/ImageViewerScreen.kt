@@ -24,6 +24,8 @@ import org.nigao.zhihuLite.business_logic.feed.data.AnswerApi
 import org.nigao.zhihuLite.business_logic.feed.data.FeedStorage
 import org.nigao.zhihuLite.business_ui.AnswerWiring
 import org.nigao.zhihuLite.business_ui.R
+import androidx.compose.runtime.staticCompositionLocalOf
+import org.nigao.zhihuLite.business_logic.answer.imageUrls
 
 /**
  * The images the viewer can show for [answerId], cached copy first.
@@ -42,10 +44,63 @@ suspend fun resolveViewerImageUrls(
     answerId: String,
     storage: FeedStorage,
     api: AnswerApi,
-): List<String> =
-    storage.findItem(answerId)?.target?.thumbnails?.takeIf { it.isNotEmpty() }
-        ?: api.getAnswer(answerId)?.target?.thumbnails?.takeIf { it.isNotEmpty() }
-        ?: emptyList()
+): List<String> = resolveViewerItem(answerId, storage, api)?.target?.thumbnails.orEmpty()
+
+/**
+ * Which urls the viewer pages through, and where to start.
+ *
+ * With an [imageUrl] the reader tapped a picture inside the body, so the body's own images are the
+ * list — the answer's `thumbnails` share no file with them (measured over four answers), and paging
+ * there would show a different picture than the one tapped. Without one the card's cover was tapped
+ * and the thumbnails are right. The start is found by url, so a list that happens to carry an extra
+ * entry still opens the tapped picture.
+ */
+fun viewerImagesFor(
+    thumbnails: List<String>,
+    bodyUrls: List<String>,
+    imageUrl: String?,
+    requestedPage: Int,
+): Pair<List<String>, Int> {
+    if (imageUrl.isNullOrBlank()) {
+        val page = requestedPage.coerceIn(0, (thumbnails.size - 1).coerceAtLeast(0))
+        return thumbnails to page
+    }
+    val urls = bodyUrls.ifEmpty { listOf(imageUrl) }
+    return urls to urls.indexOf(imageUrl).coerceAtLeast(0)
+}
+
+/** The stored or fetched item, which is what carries both the thumbnails and the body. */
+private suspend fun resolveViewerItem(
+    answerId: String,
+    storage: FeedStorage,
+    api: AnswerApi,
+) = storage.findItem(answerId) ?: api.getAnswer(answerId)
+
+/** The viewer's list and start page, resolved from whichever item is available. */
+suspend fun resolveViewerImages(
+    answerId: String,
+    storage: FeedStorage,
+    api: AnswerApi,
+    imageUrl: String?,
+    requestedPage: Int,
+): Pair<List<String>, Int> {
+    val item = resolveViewerItem(answerId, storage, api)
+    return viewerImagesFor(
+        thumbnails = item?.target?.thumbnails.orEmpty(),
+        bodyUrls = item?.target?.content?.let(::imageUrls).orEmpty(),
+        imageUrl = imageUrl,
+        requestedPage = requestedPage,
+    )
+}
+
+/**
+ * How a picture inside a rendered body asks to be opened full screen.
+ *
+ * The same shape as `LocalVideoPlaybackRequest`, for the same reason: the destination owns the
+ * navigation graph, so an element deep inside a body calls this instead of holding a controller. The
+ * answer id travels with the url because the viewer needs it to resolve the body's images.
+ */
+val LocalImageOpenRequest = staticCompositionLocalOf<((answerId: String, url: String) -> Unit)?> { null }
 
 /**
  * Full-screen image viewer.
@@ -63,18 +118,21 @@ fun ImageViewerScreen(
     wiring: AnswerWiring,
     onDismiss: () -> Unit,
     initialPage: Int = 0,
+    imageUrl: String? = null,
     modifier: Modifier = Modifier,
 ) {
-    // `null` while resolving, then the (possibly empty) list of urls.
-    val thumbnails by produceState<List<String>?>(initialValue = null, answerId) {
-        value = resolveViewerImageUrls(
+    // `null` while resolving, then the (possibly empty) list of urls and the page to open.
+    val resolved by produceState<Pair<List<String>, Int>?>(initialValue = null, answerId, imageUrl) {
+        value = resolveViewerImages(
             answerId = answerId,
             storage = wiring.storage,
             api = wiring.answerApi,
+            imageUrl = imageUrl,
+            requestedPage = initialPage,
         )
     }
 
-    when (val urls = thumbnails) {
+    when (val images = resolved) {
         null -> ViewerMessage(
             text = stringResource(R.string.feed_loading),
             showSpinner = true,
@@ -82,7 +140,7 @@ fun ImageViewerScreen(
             modifier = modifier,
         )
 
-        else -> if (urls.isEmpty()) {
+        else -> if (images.first.isEmpty()) {
             ViewerMessage(
                 text = stringResource(R.string.image_viewer_empty),
                 showSpinner = false,
@@ -91,8 +149,8 @@ fun ImageViewerScreen(
             )
         } else {
             ImageViewer(
-                imageUrls = urls,
-                initialPage = initialPage,
+                imageUrls = images.first,
+                initialPage = images.second,
                 onDismiss = onDismiss,
                 modifier = modifier,
             )

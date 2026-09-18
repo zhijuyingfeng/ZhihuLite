@@ -5,6 +5,8 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.nigao.zhihuLite.business_logic.answer.HtmlNode
+import org.nigao.zhihuLite.business_logic.answer.imageSourceUrl
+import org.nigao.zhihuLite.business_logic.answer.imageUrls
 import org.nigao.zhihuLite.business_logic.answer.parseSimpleHtml
 
 /**
@@ -129,5 +131,70 @@ class H5ParserTest {
             val nodes = parseSimpleHtml(input)
             assertNotNull("parseSimpleHtml(\"$input\") returned null", nodes)
         }
+    }
+
+    @Test
+    fun `bodyImagesComeBackInDocumentOrder`() {
+        // The shape a figure-wrapped picture actually has, plus one wrapped in a div.
+        val html = """
+            <p>文字</p>
+            <figure><img src="https://pic.example/one.jpg" width="640" height="480"></figure>
+            <div><img src="https://pic.example/two.jpg"></div>
+        """.trimIndent()
+
+        assertEquals(
+            listOf("https://pic.example/one.jpg", "https://pic.example/two.jpg"),
+            imageUrls(html),
+        )
+    }
+
+    @Test
+    fun `emojiAreNotPicturesToBrowse`() {
+        // A sticker is a piece of text; paging through a viewer full of them would be nonsense.
+        val html = """
+            <p>还行<img src="https://pic.example/sticker.png" class="sticker" alt="[调皮]">吧</p>
+            <figure><img src="https://pic.example/real.jpg"></figure>
+        """.trimIndent()
+
+        assertEquals(listOf("https://pic.example/real.jpg"), imageUrls(html))
+    }
+
+    @Test
+    fun `aBodyWithoutPicturesYieldsNothing`() {
+        assertEquals(emptyList<String>(), imageUrls("<p>只有文字</p>"))
+        assertEquals(emptyList<String>(), imageUrls(""))
+        assertEquals(emptyList<String>(), imageUrls("""<figure><img alt="no src"></figure>"""))
+    }
+
+    @Test
+    fun `the lazy-load placeholder is not a picture to draw`() {
+        // Exactly what the feed sends: a data: SVG sized to the photo, the real address beside it.
+        val placeholder = mapOf(
+            "src" to "data:image/svg+xml;utf8,&lt;svg width=&#39;1418&#39; height=&#39;1179&#39;&gt;&lt;/svg&gt;",
+            "data-original" to "https://pic1.zhimg.com/v2-real_r.jpg",
+            "data-actualsrc" to "https://pic1.zhimg.com/v2-real_720w.jpg",
+            "data-rawwidth" to "1418",
+            "data-rawheight" to "1179",
+        )
+
+        assertEquals(null, imageSourceUrl(placeholder))
+        assertEquals(emptyList<String>(), imageUrls("""<figure><img src="data:image/svg+xml;utf8,x" data-rawwidth="1418" data-rawheight="1179"></figure>"""))
+    }
+
+    @Test
+    fun `a real source wins, and the attributes only stand in when there is none`() {
+        assertEquals(
+            "https://pic.example/plain.jpg",
+            imageSourceUrl(mapOf("src" to "https://pic.example/plain.jpg")),
+        )
+        // No src at all: the payload still told us where the picture is.
+        assertEquals(
+            "https://pic.example/actual.jpg",
+            imageSourceUrl(mapOf("data-actualsrc" to "https://pic.example/actual.jpg")),
+        )
+        assertEquals(
+            "https://pic.example/original.jpg",
+            imageSourceUrl(mapOf("data-original" to "https://pic.example/original.jpg")),
+        )
     }
 }

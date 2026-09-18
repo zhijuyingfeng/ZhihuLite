@@ -60,4 +60,11 @@ data class QuestionDetailRoute(
 data class ImageViewerRoute(
     val answerId: String,
     val page: Int = 0,
+    /**
+     * The picture that was tapped, when the tap came from inside the body.
+     *
+     * It selects *which* list the viewer pages through: the answer's body images, starting at this
+     * one. The card's cover carries no url and pages through the answer's `thumbnails` as before.
+     */
+    val imageUrl: String? = null,
 ) : AppRoute

@@ -5,6 +5,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 import org.nigao.zhihuLite.business_logic.feed.data.FeedQuery
 import org.nigao.zhihuLite.business_ui.shared.resolveViewerImageUrls
+import org.nigao.zhihuLite.business_ui.shared.viewerImagesFor
 
 /**
  * Where the image viewer gets its urls.
@@ -51,5 +52,70 @@ class ImageViewerResolutionTest {
 
         // The screen renders its "no images" state for this; before, the empty list meant a blank window.
         assertEquals(emptyList<String>(), resolveViewerImageUrls("answer-404", storage, api))
+    }
+
+    @Test
+    fun `a cover tap pages through the thumbnails at the requested page`() {
+        val (urls, page) = viewerImagesFor(
+            thumbnails = listOf("cover-1", "cover-2", "cover-3"),
+            bodyUrls = listOf("body-1", "body-2"),
+            imageUrl = null,
+            requestedPage = 2,
+        )
+
+        assertEquals(listOf("cover-1", "cover-2", "cover-3"), urls)
+        assertEquals(2, page)
+    }
+
+    @Test
+    fun `a body tap pages through the body images, opening the one tapped`() {
+        // The two lists share no file in real payloads, so this is the whole point of the url.
+        val (urls, page) = viewerImagesFor(
+            thumbnails = listOf("cover-1", "cover-2"),
+            bodyUrls = listOf("body-1", "body-2", "body-3"),
+            imageUrl = "body-3",
+            requestedPage = 0,
+        )
+
+        assertEquals(listOf("body-1", "body-2", "body-3"), urls)
+        assertEquals("the tapped picture is the one shown", 2, page)
+    }
+
+    @Test
+    fun `an unknown url still opens something rather than nothing`() {
+        val (urls, page) = viewerImagesFor(
+            thumbnails = emptyList(),
+            bodyUrls = listOf("body-1"),
+            imageUrl = "not-in-the-list",
+            requestedPage = 0,
+        )
+
+        assertEquals(listOf("body-1"), urls)
+        assertEquals(0, page)
+    }
+
+    @Test
+    fun `an unresolvable body falls back to the tapped url alone`() {
+        val (urls, page) = viewerImagesFor(
+            thumbnails = emptyList(),
+            bodyUrls = emptyList(),
+            imageUrl = "tapped",
+            requestedPage = 0,
+        )
+
+        assertEquals(listOf("tapped"), urls)
+        assertEquals(0, page)
+    }
+
+    @Test
+    fun `a requested page beyond the list is clamped`() {
+        val (_, page) = viewerImagesFor(
+            thumbnails = listOf("cover-1"),
+            bodyUrls = emptyList(),
+            imageUrl = null,
+            requestedPage = 9,
+        )
+
+        assertEquals(0, page)
     }
 }

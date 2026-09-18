@@ -71,6 +71,15 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.text.appendInlineContent
 import kotlinx.coroutines.CancellationException
+import org.nigao.zhihuLite.base_ui.noRippleClickable
+import org.nigao.zhihuLite.business_ui.shared.LocalImageOpenRequest
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalWindowInfo
+import org.nigao.zhihuLite.business_ui.shared.ImageOpenHint
+import org.nigao.zhihuLite.business_ui.shared.imageZoomFrom
+import androidx.compose.ui.layout.boundsInRoot
+import org.nigao.zhihuLite.business_logic.answer.imageSourceUrl
 
 /**
  * Renders parsed answer/comment HTML as Compose UI.
@@ -262,7 +271,7 @@ private fun HtmlNodesToComposeUi(
                         "img" -> if (isStickerImage(node)) {
                             InlineElement(node, textStyle, linkStyle, onLinkClick, imageLoader)
                         } else {
-                            ImageElement(node, textStyle, imageLoader)
+                            ImageElement(node, textStyle, imageLoader, answerId)
                         }
                         // Wrappers that must leave no trace: a picture in a `figure`, markup in a
                         // `noscript` fallback. Rendering their children is the whole job.
@@ -554,8 +563,12 @@ private fun ImageElement(
     element: HtmlNode.Element,
     baseStyle: TextStyle,
     imageLoader: ImageLoader?,
+    answerId: String?,
 ) {
-    val src = element.attributes["src"].orEmpty()
+    // A `data:` placeholder is not a picture: it is Zhihu's lazy-load stand-in, reserved at the real
+    // picture's size, and drawing it is what left a blank box the height of a photo under one.
+    val src = imageSourceUrl(element.attributes)
+    if (src == null) return
     val altText = element.attributes["alt"].orEmpty()
     val size = htmlImageIntrinsicSize(element)
     // The declared ratio reserves the space before the bitmap arrives; the bitmap's own ratio wins
@@ -572,7 +585,32 @@ private fun ImageElement(
     // brings its own top padding and line leading, so padding the image's bottom too made the gap
     // under a picture half again as big as the one above it — 12.0dp against 8.9dp, measured on a
     // real answer. Two pictures in a row are 4dp apart, which is how a run of figures should read.
+    // Tapping a picture opens it full screen, the way tapping a video plate plays it: the
+    // destination provides the callback through a local, so nothing here holds a nav controller.
+    // Where the picture sat is recorded too, so the viewer can grow out of it.
+    val openImage = LocalImageOpenRequest.current
+    val windowSize = LocalWindowInfo.current.containerSize
+    var bounds by remember(element) { mutableStateOf<Rect?>(null) }
+    val clickable = if (openImage != null && !answerId.isNullOrBlank() && src.isNotEmpty()) {
+        Modifier
+            .onGloballyPositioned { bounds = it.boundsInRoot() }
+            .noRippleClickable {
+                ImageOpenHint.record(
+                    bounds?.let {
+                        imageZoomFrom(
+                            imageRect = it,
+                            screenSize = Size(windowSize.width.toFloat(), windowSize.height.toFloat()),
+                        )
+                    },
+                )
+                openImage(answerId, src)
+            }
+    } else {
+        Modifier
+    }
+
     val modifier = Modifier
+        .then(clickable)
         .fillMaxWidth()
         .clip(RoundedCornerShape(4.dp))
 
@@ -777,7 +815,7 @@ private fun BlockElement(
 
                 is HtmlNode.Element -> {
                     if (normalizeTagName(child.tagName) == "img") {
-                        ImageElement(child, baseStyle, imageLoader)
+                        ImageElement(child, baseStyle, imageLoader, answerId)
                     } else {
                         UnknownElement(answerId, child, baseStyle, linkStyle, imageLoader, onLinkClick, depth)
                     }

@@ -32,6 +32,14 @@ import org.nigao.zhihuLite.business_ui.video.FullScreenVideoScreen
 import org.nigao.zhihuLite.business_ui.video.LocalVideoPlaybackRequest
 import org.nigao.zhihuLite.business_ui.login.LogOutScreen
 import org.nigao.zhihuLite.business_ui.feed.FeedScreen
+import org.nigao.zhihuLite.business_ui.shared.LocalImageOpenRequest
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleOut
+import androidx.compose.ui.graphics.TransformOrigin
+import org.nigao.zhihuLite.business_ui.shared.ImageOpenHint
+import org.nigao.zhihuLite.business_ui.shared.consumeDismissedByDrag
+import androidx.navigation.NavDestination.Companion.hasRoute
 
 /**
  * The whole navigation graph, written out explicitly.
@@ -86,9 +94,13 @@ fun AssembleAppNavHost(
         }
 
         composable<MainFeedRoute>(
-            // Pushing into a page slides the list away; coming back slides it in again.
+            // Pushing into a page slides the list away; coming back slides it in again — except when
+            // returning from the viewer, where the picture has just animated back onto its thumbnail
+            // (a drag, or the exit transition) and a slide would fight that.
             exitTransition = { pushExit() },
-            popEnterTransition = { popEnter() },
+            popEnterTransition = {
+                if (initialState.destination.hasRoute<ImageViewerRoute>()) fadeIn() else popEnter()
+            },
         ) {
             FeedScreen(
                 onNavigate = { route -> navController.navigate(route) },
@@ -102,7 +114,10 @@ fun AssembleAppNavHost(
         composable<QuestionDetailRoute>(
             enterTransition = { pushEnter() },
             exitTransition = { pushExit() },
-            popEnterTransition = { popEnter() },
+            // Same exception as the feed on the way back from the viewer.
+            popEnterTransition = {
+                if (initialState.destination.hasRoute<ImageViewerRoute>()) fadeIn() else popEnter()
+            },
             popExitTransition = { popExit() },
         ) { backStackEntry ->
             val route = backStackEntry.toRoute<QuestionDetailRoute>()
@@ -111,6 +126,11 @@ fun AssembleAppNavHost(
             CompositionLocalProvider(
                 LocalVideoPlaybackRequest provides { answerId, videoId ->
                     navController.navigate(FullScreenVideoRoute(answerId = answerId, videoId = videoId))
+                },
+                // A picture inside a body asks the same way, and the url travels with it so the viewer
+                // pages through the body's own images rather than the answer's cropped covers.
+                LocalImageOpenRequest provides { answerId, url ->
+                    navController.navigate(ImageViewerRoute(answerId = answerId, imageUrl = url))
                 },
             ) {
                 AnswerFeedScreen(
@@ -139,16 +159,30 @@ fun AssembleAppNavHost(
         }
 
         composable<ImageViewerRoute>(
+            // Opens with the ordinary push. Leaving still zooms back onto the picture that was tapped
+            // — the same landing a drag uses — because by then the reader has seen where it came from.
             enterTransition = { pushEnter() },
-            popExitTransition = { popExit() },
+            popExitTransition = {
+                // A drag already animated the picture back to its thumbnail, so the destination must
+                // not play an exit of its own on top of that.
+                if (consumeDismissedByDrag()) ExitTransition.None
+                else ImageOpenHint.last()?.let { zoom ->
+                    scaleOut(
+                        targetScale = zoom.scale,
+                        transformOrigin = TransformOrigin(zoom.originX, zoom.originY),
+                    ) + fadeOut()
+                } ?: popExit()
+            },
         ) { backStackEntry ->
             val route = backStackEntry.toRoute<ImageViewerRoute>()
             ImageViewerScreen(
                 answerId = route.answerId,
-                // The viewer resolves the answer's images itself, so it needs the same wiring the
-                // other screens get — the local feed copy is what actually holds them.
+                // The viewer resolves the answer's images itself (the body's, when the tap came from
+                // there), so it needs the same wiring the other screens get — the local feed copy is
+                // what actually holds them.
                 wiring = backStackEntry.defaultViewModelCreationExtras.requireWiring<AnswerWiring>(),
                 initialPage = route.page,
+                imageUrl = route.imageUrl,
                 onDismiss = { navController.popBackStack() },
             )
         }

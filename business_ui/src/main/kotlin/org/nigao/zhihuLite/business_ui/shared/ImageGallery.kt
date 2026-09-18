@@ -13,6 +13,15 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import org.nigao.zhihuLite.base_ui.noRippleClickable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.layout.boundsInRoot
 
 @Composable
 fun ImageGallery(
@@ -32,6 +41,8 @@ fun ImageGallery(
             contentType = { "image" },
         ) { index ->
             val imageUrl = imageUrls[index]
+            var bounds by remember(imageUrl) { mutableStateOf<Rect?>(null) }
+            val windowSize = LocalWindowInfo.current.containerSize
             AsyncImage(
                 model = imageUrl,
                 contentDescription = imageUrl,
@@ -41,7 +52,16 @@ fun ImageGallery(
                 modifier = Modifier
                     .fillMaxHeight()
                     .aspectRatio(4f / 3f)
+                    .onGloballyPositioned { bounds = it.boundsInRoot() }
                     .noRippleClickable {
+                        ImageOpenHint.record(
+                            bounds?.let {
+                                imageZoomFrom(
+                                    imageRect = it,
+                                    screenSize = Size(windowSize.width.toFloat(), windowSize.height.toFloat()),
+                                )
+                            },
+                        )
                         onClick(index)
                     }
                     .padding(end = 8.dp)

@@ -165,6 +165,52 @@ object HtmlParseCache {
 }
 
 /**
+ * The address worth loading for an image element, or null when there is none.
+ *
+ * Feed payloads lazy-load their pictures: the `src` is a `data:image/svg+xml` placeholder drawn at the
+ * real picture's size, with the address in `data-actualsrc`/`data-original` and a usable copy in a
+ * `<noscript>` beside it. Loading the placeholder is what reserves an empty box the height of the
+ * picture — the blank stretch readers see under a photo in the feed — so it is skipped, and the
+ * `<noscript>` copy is what gets drawn. The attributes are only a fallback, for the payloads that
+ * carry no usable `src` at all.
+ */
+fun imageSourceUrl(attributes: Map<String, String>): String? {
+    val src = attributes["src"]
+    if (src != null && src.startsWith("http")) return src
+    if (src != null && src.startsWith("data:")) return null
+    return listOf("data-actualsrc", "data-original")
+        .firstNotNullOfOrNull { key -> attributes[key]?.takeIf { it.startsWith("http") } }
+}
+
+/**
+ * The pictures in [html], in document order.
+ *
+ * The image viewer needs these rather than the answer's `thumbnails`: measured over four cached
+ * answers, the two sets share no file at all — the feed carries separately cropped covers — so tapping
+ * a picture inside a body has to page through the body's own images, or it would open a different
+ * picture than the one tapped.
+ *
+ * Emoji are excluded: a `class="sticker"` image is a piece of text, not a picture to browse. Parsing
+ * is cached ([HtmlParseCache]), so asking costs a walk.
+ */
+fun imageUrls(html: String): List<String> {
+    val urls = mutableListOf<String>()
+
+    fun walk(node: HtmlNode) {
+        if (node !is HtmlNode.Element) return
+        if (normalizeTagName(node.tagName) == "img" &&
+            !node.attributes["class"].orEmpty().contains("sticker")
+        ) {
+            imageSourceUrl(node.attributes)?.let { urls += it }
+        }
+        node.children.forEach(::walk)
+    }
+
+    HtmlParseCache.parse(html).forEach(::walk)
+    return urls
+}
+
+/**
  * The id of the first `video-box` in [html], or `null` when the body has no video.
  *
  * A feed card knows it is a video only by its body: the video id lives in the anchor's
@@ -191,7 +237,7 @@ fun firstVideoId(html: String): String? {
         }
         return null
     }
-    return parseSimpleHtml(html).firstNotNullOfOrNull(::findVideoId)
+    return  parseSimpleHtml(html).firstNotNullOfOrNull(::findVideoId)
 }
 
 fun parseSimpleHtml(html: String): List<HtmlNode> {

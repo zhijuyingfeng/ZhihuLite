@@ -65,6 +65,10 @@ import org.nigao.zhihuLite.business_logic.share.saveImageToPictures
 import org.nigao.zhihuLite.business_logic.share.shareImage
 import kotlinx.coroutines.launch
 import kotlin.math.min
+import org.nigao.zhihuLite.business_ui.shared.ImageOpenHint
+import org.nigao.zhihuLite.business_ui.shared.dismissScaleFor
+import org.nigao.zhihuLite.business_ui.shared.dismissTargetFor
+import org.nigao.zhihuLite.business_ui.shared.markDismissedByDrag
 
 @Composable
 fun ImageViewer(
@@ -82,6 +86,7 @@ fun ImageViewer(
     val density = LocalDensity.current
     val coroutineScope = rememberCoroutineScope()
     // The image whose long-press menu is open, and where on the screen it was pressed.
+    var dismissProgress by remember { mutableStateOf(0f) }
     var menuUrl by remember { mutableStateOf<String?>(null) }
     var menuPosition by remember { mutableStateOf(Offset.Zero) }
     var containerSize by remember { mutableStateOf(IntSize.Zero) }
@@ -161,7 +166,7 @@ fun ImageViewer(
 
     Box(
         modifier = modifier.fillMaxSize()
-            .background(color = Color.Black)
+            .background(color = Color.Black.copy(alpha = 1f - dismissProgress))
             .onSizeChanged { containerSize = it }
     ) {
         HorizontalPager(
@@ -180,7 +185,8 @@ fun ImageViewer(
                 onLongPress = { position ->
                     menuPosition = position
                     menuUrl = imageUrls[page]
-                }
+                },
+                onDismissProgress = { progress -> dismissProgress = progress },
             )
         }
 
@@ -322,10 +328,15 @@ fun ZoomableImage(
     onZoomChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
     onLongPress: (Offset) -> Unit = {},
+    onDismissProgress: (Float) -> Unit = {},
 ) {
     val scale = remember { Animatable(1f) }
     val offsetX = remember { Animatable(0f) }
     val offsetY = remember { Animatable(0f) }
+    // Pulling the picture to the right: it follows the finger and shrinks with the distance, then
+    // settles onto the thumbnail it came from and leaves.
+    val dismissX = remember { Animatable(0f) }
+    val dismissScale = remember { Animatable(1f) }
     var contentSize by remember { mutableStateOf(IntSize.Zero) }
     var containerSize by remember { mutableStateOf(IntSize.Zero) }
     val coroutineScope = rememberCoroutineScope()
@@ -400,7 +411,20 @@ fun ZoomableImage(
                         val panChange = event.calculatePan()
                         val centroid = event.calculateCentroid(useCurrent = false)
 
-                        if (zoomChange != 1f || panChange != Offset.Zero) {
+                        // At rest, a rightward drag is the way out; leftward belongs to the pager,
+                        // which is why nothing is consumed in that direction.
+                        val pullingRight = scale.value == 1f && panChange.x > 0f &&
+                            kotlin.math.abs(panChange.x) > kotlin.math.abs(panChange.y)
+                        if (pullingRight) {
+                            // Computed before the snaps are launched, so the scale follows this frame's
+                            // distance rather than the previous one's.
+                            val dragged = (dismissX.value + panChange.x).coerceAtLeast(0f)
+                            val shrunk = dismissScaleFor(dragged, containerSize.width.toFloat())
+                            coroutineScope.launch { dismissX.snapTo(dragged) }
+                            coroutineScope.launch { dismissScale.snapTo(shrunk) }
+                            onDismissProgress(1f - shrunk)
+                            event.changes.forEach { it.consume() }
+                        } else if (zoomChange != 1f || panChange != Offset.Zero) {
                             val currentScale = scale.value
                             val newScale = (currentScale * zoomChange).coerceIn(0.5f, 5f)
 
@@ -431,6 +455,25 @@ fun ZoomableImage(
                             }
                         }
                     } while (event.changes.any { it.pressed })
+
+                    if (dismissX.value > 0f) {
+                        // Settle onto the thumbnail the picture came from, then leave without letting
+                        // the destination play its own exit on top (that would jump: it would start
+                        // from the full-screen state).
+                        val (targetX, targetScale) = dismissTargetFor(
+                            ImageOpenHint.last(),
+                            containerSize.width.toFloat(),
+                        )
+                        coroutineScope.launch {
+                            dismissScale.animateTo(targetScale, animationSpec = tween(220))
+                            dismissX.animateTo(targetX, animationSpec = tween(220))
+                            onDismissProgress(1f - targetScale)
+                            markDismissedByDrag()
+                            onDismiss()
+                        }
+                        return@awaitEachGesture
+                    }
+
                     if (scale.value < 1f) {
                         coroutineScope.launch {
                             scale.animateTo(1f, animationSpec = tween(300))
@@ -455,9 +498,9 @@ fun ZoomableImage(
             },
             modifier = Modifier.fillMaxSize()
                 .graphicsLayer {
-                    scaleX = scale.value
-                    scaleY = scale.value
-                    translationX = offsetX.value
+                    scaleX = scale.value * dismissScale.value
+                    scaleY = scale.value * dismissScale.value
+                    translationX = offsetX.value + dismissX.value
                     translationY = offsetY.value
                 }
         )
